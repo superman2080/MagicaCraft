@@ -1,0 +1,36 @@
+using System;
+using UnityEngine;
+
+[Flags]
+public enum StatusEffectType
+{
+    NONE = 0,
+    NORMAL_CC = 1 << 0,
+    HARD_CC = 1 << 1,
+    BUFF = 1 << 2,
+}
+
+public abstract class StatusEffect
+{
+    public int Level { get; protected set; }
+    public float Duration { get; set; }
+    public float MaxDuration { get; protected set; }
+    public Entity Caster { get; protected set; }
+
+    public abstract StatusEffectType Type { get; }
+
+    public StatusEffect(int level, float duration, Entity caster = null, params object[] datas)
+    {
+        this.Level = level;
+        this.Duration = MaxDuration = duration;
+        this.Caster = caster;
+    }
+
+    public abstract void OnStart(Entity target);
+
+    public abstract void OnUpdate(Entity target);
+
+    public abstract void OnExit(Entity target);
+}
+
+
