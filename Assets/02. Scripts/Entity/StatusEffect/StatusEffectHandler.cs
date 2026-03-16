@@ -2,12 +2,17 @@ using System.Collections.Generic;
 using UnityEngine;
 using System.Linq;
 
-public delegate void OnEffectStartHandler(StatusEffectHandler sender, StatusEffect effect);
+public delegate void OnEffectEnterHandler(Entity sender, Entity target, StatusEffect effect);
+public delegate void OnEffectExecuteHandler(Entity sender, Entity target, StatusEffect effect);
+public delegate void OnEffectExitHandler(Entity sender, Entity target, StatusEffect effect);
 
 public class StatusEffectHandler
 {
     public Entity Caster { get; private set; }
     private List<StatusEffect> statusEffects = new List<StatusEffect>();
+    public event OnEffectEnterHandler OnEffectEnter;
+    public event OnEffectExecuteHandler OnEffectExecute;
+    public event OnEffectExitHandler OnEffectExit;
 
     public StatusEffectHandler(Entity caster)
     {
@@ -23,6 +28,11 @@ public class StatusEffectHandler
         effect.OnStart(Caster);
     }
 
+    public StatusEffect GetEffect<T>() where T : StatusEffect
+    {
+        return statusEffects.Find(n => n is T);
+    }
+
     public bool HasEffect<T>() where T : StatusEffect
     {
         return !(statusEffects.Find(n => n is T) is null);
@@ -31,6 +41,11 @@ public class StatusEffectHandler
     public bool HasEffect(StatusEffectType type)
     {
         return !(statusEffects.Find(n => n.Type == type) is null);
+    }
+
+    public IEnumerable<StatusEffect> GetEffects(StatusEffectType type)
+    {
+        return statusEffects.Where(e => e.Type == type);
     }
 
     public void UpdateEffect()
@@ -62,5 +77,13 @@ public class StatusEffectHandler
         foreach (var eff in statusEffects)
             eff.OnExit(Caster);
         statusEffects.Clear();
+    }
+
+    public void ClearEffects(StatusEffectType type)
+    {
+        var delEffects = statusEffects.Where(eff => eff.Type == type).ToList();
+        foreach (var eff in delEffects)
+            eff.OnExit(Caster);
+        statusEffects.RemoveAll(eff => delEffects.Contains(eff));
     }
 }

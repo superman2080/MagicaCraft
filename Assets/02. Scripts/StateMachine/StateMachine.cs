@@ -154,6 +154,11 @@ public class StateMachine<T> where T : MonoBehaviour
         RegisterCondition(GetState(from), GetState(to), condition);
     }
 
+    public void RegisterCondition(Enum from, StateBase<T> to, Func<bool> condition)
+    {
+        RegisterCondition(GetState(from), to, condition);
+    }
+
     // 특정 from → to 전환 조건 제거 (인스턴스 직접 지정)
     public void UnregisterCondition(StateBase<T> from, StateBase<T> to)
     {

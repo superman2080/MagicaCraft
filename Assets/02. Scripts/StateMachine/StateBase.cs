@@ -5,6 +5,13 @@ using UnityEngine;
 // 각 메서드는 virtual이므로 필요한 것만 override하여 사용한다.
 public abstract class StateBase<T> : IState<T> where T : MonoBehaviour
 {
+    private Entity caster;
+
+    protected StateBase(Entity caster)
+    {
+        this.caster = caster;
+    }
+
     public virtual void Enter(T caster) { }
 
     public virtual void Execute(T caster) { }

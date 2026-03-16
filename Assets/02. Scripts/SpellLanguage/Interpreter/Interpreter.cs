@@ -50,6 +50,14 @@ public class Interpreter
             ExecuteStmt(stmt);
     }
 
+    // SpellFunction 본문(List<Stmt>)을 직접 실행하는 진입점
+    // SpellProjectile 콜백(onHit, onUpdate)에서 사용한다.
+    public void Run(List<Stmt> stmts)
+    {
+        foreach (var stmt in stmts)
+            ExecuteStmt(stmt);
+    }
+
     // ─── 문장 실행 ────────────────────────────────────────────
 
     private void ExecuteStmt(Stmt stmt)
@@ -170,18 +178,32 @@ public class Interpreter
         };
     }
 
-    // target.Hp, pos.X, self.Position 등
+    // target.Hp, pos.X, self.Position, proj.velocity 등
     private object EvalMember(MemberExpr e)
     {
         var obj = EvalExpr(e.Object);
 
         return obj switch
         {
-            Entity  entity => EvalEntityMember(entity, e.Member, e.Line, e.Column),
-            Vector2 v      => EvalVector2Member(v, e.Member, e.Line, e.Column),
+            Entity              entity => EvalEntityMember(entity, e.Member, e.Line, e.Column),
+            Vector2             v      => EvalVector2Member(v, e.Member, e.Line, e.Column),
+            SpellProjectileData proj   => EvalProjectileMember(proj, e.Member, e.Line, e.Column),
             _ => throw new RuntimeException(
                     $"'{obj?.GetType().Name ?? "null"}'은 멤버 접근('.{e.Member}')을 지원하지 않습니다.",
                     e.Line, e.Column)
+        };
+    }
+
+    private object EvalProjectileMember(SpellProjectileData proj, string member, int line, int col)
+    {
+        return member switch
+        {
+            "position" => (object)proj.Position,
+            "velocity" => (object)proj.Velocity,
+            "speed"    => (double)proj.Speed,
+            "damage"   => (double)proj.Damage,
+            "element"  => (object)proj.Element,
+            _ => throw new RuntimeException($"Projectile에 '{member}' 필드가 없습니다.", line, col)
         };
     }
 
@@ -288,7 +310,7 @@ public class Interpreter
         return e.Op switch
         {
             "+"  => AddValues(left, right, e.Line, e.Column),
-            "-"  => ToDouble(left, e.Line, e.Column) - ToDouble(right, e.Line, e.Column),
+            "-"  => SubValues(left, right, e.Line, e.Column),
             "*"  => MulValues(left, right, e.Line, e.Column),
             "/"  => DivValues(left, right, e.Line, e.Column),
             "%"  => ToDouble(left, e.Line, e.Column) % ToDouble(right, e.Line, e.Column),
@@ -325,6 +347,13 @@ public class Interpreter
         if (l is string || r is string) return ToStringVal(l) + ToStringVal(r);
         if (l is Vector2 vl && r is Vector2 vr) return vl + vr;
         return ToDouble(l, line, col) + ToDouble(r, line, col);
+    }
+
+    // -: 숫자 뺄셈 / Vector2 뺄셈
+    private object SubValues(object l, object r, int line, int col)
+    {
+        if (l is Vector2 vl && r is Vector2 vr) return vl - vr;
+        return ToDouble(l, line, col) - ToDouble(r, line, col);
     }
 
     // *: 숫자 곱셈 / Vector2 × scalar
@@ -472,6 +501,14 @@ public class Interpreter
             if (val < 0)
                 throw new RuntimeException("Sqrt에 음수를 전달할 수 없습니다.", line, col);
             return Math.Sqrt(val);
+        }));
+
+        // Normalize(vec) : Vec2를 단위 벡터로 반환
+        _env.Define("Normalize", new SpellBuiltin((args, line, col) =>
+        {
+            if (args.Count != 1)
+                throw new RuntimeException("Normalize(vec): 인자 1개 필요", line, col);
+            return (object)ToVector2(args[0], line, col).normalized;
         }));
     }
 }

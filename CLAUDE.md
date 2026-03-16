@@ -59,6 +59,30 @@ Entity (abstract, IDamagable)
 
 새 상태 추가: `StateBase` 상속 → `RegisterState()` → `RegisterCondition()`.
 
+#### HardCC 우선순위 시스템
+
+`HardCCState`(`CompositeStateBase` 상속)가 모든 제어 불가능 상태이상을 통합 관리한다.
+
+- `StatusEffect.Priority` (virtual, 기본 0) — 높을수록 우선 적용
+- 동시에 여러 HardCC가 걸리면 Priority 최고값의 서브 상태가 활성화된다
+- 메인 FSM은 `HardCCStates.HardCC`(복합 상태)만 알고, 내부 전환은 `HardCCState`가 담당
+
+`HardCCStates` 열거형:
+
+| 값 | 용도 |
+|---|---|
+| `HardCC` | 메인 FSM 등록 키 (CompositeStateBase) |
+| `Fear` | SubStateMachine 서브 상태 키, Priority 100 |
+| `Stun` | SubStateMachine 서브 상태 키, Priority 0 (추후 구현) |
+
+새 HardCC 추가 방법 (`Entity.cs`):
+1. `HardCCStates`에 열거값 추가
+2. `HardCCState.effectToState` 딕셔너리에 `{ typeof(MyCC), HardCCStates.MyCC }` 추가
+3. `HardCCState` 생성자에서 `SubStateMachine.RegisterState(HardCCStates.MyCC, new MyCCState(entity))` 추가
+
+**스탯 배율 주의사항**: `Stat<T>.InitStat()`이 LateUpdate마다 `multipleValue`를 1로 초기화한다.
+상태이상에 의한 배율 수정은 `Enter`가 아닌 `Execute`에서 매 프레임 재적용해야 한다.
+
 ### 4. 스탯 시스템 (`Entity/Stat/`)
 
 `Stat<T>` 계산식: `(baseValue + addValue) * multiplier`

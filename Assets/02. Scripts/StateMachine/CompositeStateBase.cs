@@ -13,11 +13,12 @@ using UnityEngine;
 public abstract class CompositeStateBase<T> : StateBase<T> where T : MonoBehaviour
 {
     // 자식 상태들을 관리하는 서브 스테이트 머신
-    public StateMachine<T> SubStateMachine { get; protected set; }
+    public StateMachine<Entity> SubStateMachine { get; protected set; }
 
-    public CompositeStateBase(T caster)
+    public CompositeStateBase(Entity caster): base(caster)
     {
-        SubStateMachine = new StateMachine<T>(caster);
+
+        SubStateMachine = new StateMachine<Entity>(caster);
     }
 
     // 진입: 부모 로직 실행 후 서브 머신의 초기 자식 상태 Enter 호출
