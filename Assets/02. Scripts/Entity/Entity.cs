@@ -203,7 +203,7 @@ public abstract class Entity : MonoBehaviour, IDamagable
         statusEffectHandler = new StatusEffectHandler(this);
 
         #region StateMachine
-
+        InitializeStateMachine();
 
         #endregion
     }

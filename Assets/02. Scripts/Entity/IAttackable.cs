@@ -8,5 +8,5 @@ public interface IAttackable
 
     LayerMask AttackLayer { get; }
 
-    void Attack(IDamagable target);
+    void Attack(IDamagable target, float amount);
 }
