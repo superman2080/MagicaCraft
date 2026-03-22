@@ -2,7 +2,7 @@ using System;
 using System.Collections.Generic;
 
 // 마법 실행 컨텍스트 - 인터프리터가 게임 세계와 상호작용하는 창구
-// 시전자/타겟 Entity 참조와 게임 명령어 레지스트리를 보관한다.
+// 시전자/타겟 Entity 참조, 게임 명령어 레지스트리, 아이템 레지스트리를 보관한다.
 public class SpellContext
 {
     public Entity Caster { get; }
@@ -19,11 +19,28 @@ public class SpellContext
     // value: (평가된 인자 목록, 컨텍스트, 줄번호, 열번호) → 반환값
     private readonly Dictionary<string, Func<List<object>, SpellContext, int, int, object>> _commands = new();
 
+    // 플레이어가 보유한 SpellEffectItem 레지스트리
+    // key  : DSL에서 참조할 변수명 (예: "fireBolt")
+    // value: SpellEffectItem 인스턴스
+    private readonly Dictionary<string, SpellEffectItem> _items = new();
+
     public SpellContext(Entity caster, Entity target)
     {
         Caster = caster;
         Target = target;
     }
+
+    #region 아이템 등록
+
+    // 플레이어 인벤토리의 SpellEffectItem을 DSL 변수로 등록한다.
+    // 등록 후 인터프리터 생성 전에 호출해야 InjectBuiltins에서 반영된다.
+    // 예: ctx.RegisterItem("fireBolt", myItem) → DSL에서 Fire(fireBolt, ...) 사용 가능
+    public void RegisterItem(string name, SpellEffectItem item)
+        => _items[name] = item;
+
+    public void UnregisterItem(string name) => _items.Remove(name);
+
+    #endregion
 
     #region 명령어 등록
 
@@ -50,7 +67,7 @@ public class SpellContext
     #region 내장 변수 주입
 
     // 마법 실행 시작 및 함수 호출 시 항상 사용 가능한 변수를 환경에 주입한다.
-    // self, target, power 등 플레이어가 언제나 참조할 수 있는 값들
+    // self, target, power, 속성 상수, 등록된 아이템이 포함된다.
     public void InjectBuiltins(SpellEnvironment env)
     {
         // 엔티티 참조
@@ -70,6 +87,11 @@ public class SpellContext
         env.Define("Wind",      ElementType.Wind);
         env.Define("Light",     ElementType.Light);
         env.Define("Dark",      ElementType.Dark);
+
+        // 등록된 SpellEffectItem을 DSL 변수로 주입
+        // 예: ctx.RegisterItem("fireBolt", item) → DSL에서 fireBolt로 접근
+        foreach (var (name, item) in _items)
+            env.Define(name, item);
     }
 
     #endregion

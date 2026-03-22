@@ -3,15 +3,24 @@ using System;
 // 마나 추적기 - 마법 실행 중 마나를 실시간으로 차감한다.
 // Entity의 마나 Resource를 래핑한다.
 // 마나 비용은 각 마법 명령어 구현(SpellCommands)에서 직접 정의한다.
+//
+// OnDepleted: 마나가 0이 되는 순간 1회 발생.
+// SpellProjectile·SpellSkill이 구독하여 마나 소진 시 즉시 중단한다.
 public class ManaTracker
 {
     private readonly Resource _mana;
 
     public float Remaining => _mana.CurrentValue;
 
+    // 마나가 완전히 소진될 때 발생한다 (Resource.OnDepleted 위임).
+    // SpellProjectile: 구독 시 ReturnToPool
+    // SpellSkill(Continuous): 구독 시 Cancel
+    public event Action OnDepleted;
+
     public ManaTracker(Resource mana)
     {
         _mana = mana;
+        _mana.OnDepleted += () => OnDepleted?.Invoke();
     }
 
     // 마나를 소비한다. 부족하면 OutOfManaException을 던진다.

@@ -35,5 +35,3 @@ public abstract class StatusEffect
 
     public abstract void OnExit(Entity target);
 }
-
-

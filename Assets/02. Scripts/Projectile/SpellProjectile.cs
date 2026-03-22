@@ -1,13 +1,13 @@
 using System.Collections.Generic;
 using UnityEngine;
 
-// DSL로 제어되는 마법 투사체
+// DSL로 제어되는 마법 투사체.
 // SpellProjectilePool에서 가져와 Init()으로 초기화한 뒤 사용한다.
 //
 // 이벤트 흐름:
-//   1. Fire 명령어 → Init() 호출 → 발사
-//   2. Update()   → onUpdate(proj) 콜백 실행 (null이면 스킵)
-//   3. 충돌       → onHit(victim)  콜백 실행, 기본 동작은 직접 데미지
+//   1. Fire 명령어 → Init() → item.OnStart 실행 → 발사
+//   2. Update()   → item.OnUpdate 실행 (매 프레임)
+//   3. 충돌       → item.OnEnd 실행 (proj + victim 주입). item 없으면 기본 데미지
 //   4. 수명 초과  → 자동 반환
 [RequireComponent(typeof(Rigidbody2D))]
 [RequireComponent(typeof(CircleCollider2D))]
@@ -19,21 +19,20 @@ public class SpellProjectile : Poolable
     public Rigidbody2D Rb2d { get; private set; }
 
     // ─── 투사체 파라미터 ──────────────────────────────────────
-
-    public float       Damage   { get; private set; }
-    public float       Speed    { get; internal set; }   // SetSpeed에서 쓰기 허용
-    public ElementType Element  { get; private set; }
+    // item이 null인 경우 기본 피격 처리에 사용된다.
+    public float       Damage  { get; private set; }
+    public float       Speed   { get; internal set; }   // SetSpeed에서 쓰기 허용
+    public ElementType Element { get; private set; }
 
     // ─── 내부 상태 ────────────────────────────────────────────
 
-    private SpellContext         _ctx;
-    private ManaTracker          _mana;
-    private SpellFunction        _onHit;
-    private SpellFunction        _onUpdate;
-    private SpellProjectileData  _data;
-    private LayerMask            _attackLayer;
-    private float                _spawnTime;
-    private bool                 _isAlive;
+    private SpellContext        _ctx;
+    private ManaTracker         _mana;
+    private SpellEffectItem     _item;
+    private SpellProjectileData _data;
+    private LayerMask           _attackLayer;
+    private float               _spawnTime;
+    private bool                _isAlive;
 
     // ─── Unity 생명주기 ───────────────────────────────────────
 
@@ -44,7 +43,6 @@ public class SpellProjectile : Poolable
         var col = GetComponent<CircleCollider2D>();
         col.isTrigger = true;
 
-        // 투사체는 중력 영향을 받지 않는다
         Rb2d.gravityScale = 0f;
     }
 
@@ -52,38 +50,37 @@ public class SpellProjectile : Poolable
     {
         if (!_isAlive) return;
 
-        // 수명 초과 시 반환
         if (Time.time - _spawnTime > maxLifetime)
         {
             ReturnToPool();
             return;
         }
 
-        if (_onUpdate == null) return;
+        if (_item == null) return;
 
-        RunCallback(_onUpdate, new List<object> { _data });
+        RunLifecycle(_item.RunOnUpdate,
+            new Dictionary<string, object> { ["proj"] = _data });
     }
 
     private void OnTriggerEnter2D(Collider2D other)
     {
         if (!_isAlive) return;
 
-        // 시전자 본인 제외
         if (_ctx?.Caster != null && other.gameObject == _ctx.Caster.gameObject) return;
 
-        // 공격 대상 레이어 체크
         if ((_attackLayer & (1 << other.gameObject.layer)) == 0) return;
 
         if (!other.TryGetComponent<IDamagable>(out var damagable)) return;
 
-        if (_onHit != null && other.TryGetComponent<Entity>(out var victim))
+        if (_item != null && other.TryGetComponent<Entity>(out var victim))
         {
-            // 사용자 정의 피격 처리
-            RunCallback(_onHit, new List<object> { victim });
+            // 아이템 OnEnd: proj + victim 주입
+            RunLifecycle(_item.RunOnEnd,
+                new Dictionary<string, object> { ["proj"] = _data, ["victim"] = victim });
         }
         else
         {
-            // 기본 피격 처리: 직접 데미지
+            // 아이템 없을 때 기본 피격 처리
             damagable.TakeDamage(_ctx?.Caster as IAttackable, Damage, Element);
         }
 
@@ -92,43 +89,53 @@ public class SpellProjectile : Poolable
 
     // ─── 초기화 / 풀 반환 ─────────────────────────────────────
 
-    // Fire 명령어에서 호출. 투사체를 발사 상태로 설정한다.
+    // Fire 명령어에서 호출. 투사체를 발사 상태로 설정하고 item.OnStart를 실행한다.
+    // item이 null이면 element/damage를 이용한 기본 피격 처리가 사용된다.
     public void Init(
-        SpellContext  ctx,
-        ManaTracker   mana,
-        Vector2       startPos,
-        Vector2       direction,
-        ElementType   element,
-        float         damage,
-        float         speed,
-        SpellFunction onHit    = null,
-        SpellFunction onUpdate = null)
+        SpellContext    ctx,
+        ManaTracker     mana,
+        Vector2         startPos,
+        Vector2         direction,
+        float           speed,
+        SpellEffectItem item    = null,
+        ElementType     element = ElementType.None,
+        float           damage  = 0f)
     {
-        _ctx        = ctx;
-        _mana       = mana;
-        Element     = element;
-        Damage      = damage;
-        Speed       = speed;
-        _onHit      = onHit;
-        _onUpdate   = onUpdate;
-        _data       = new SpellProjectileData(this);
-        _spawnTime  = Time.time;
-        _isAlive    = true;
+        _ctx       = ctx;
+        _mana      = mana;
+        _item      = item;
+        Speed      = speed;
+        Element    = element;
+        Damage     = damage;
+        _data      = new SpellProjectileData(this);
+        _spawnTime = Time.time;
+        _isAlive   = true;
 
-        Rb2d.position         = startPos;
-        Rb2d.linearVelocity   = direction.normalized * speed;
+        Rb2d.position       = startPos;
+        Rb2d.linearVelocity = direction.normalized * speed;
 
-        var attacker  = ctx.Caster as IAttackable;
-        _attackLayer  = attacker != null ? attacker.AttackLayer : Physics2D.AllLayers;
+        var attacker = ctx.Caster as IAttackable;
+        _attackLayer = attacker != null ? attacker.AttackLayer : Physics2D.AllLayers;
+
+        // 마나 소진 시 즉시 회수
+        _mana.OnDepleted += ReturnToPool;
+
+        // OnStart 실행
+        if (_item != null)
+            RunLifecycle(_item.RunOnStart,
+                new Dictionary<string, object> { ["proj"] = _data });
     }
 
     public override void OnDespawn()
     {
-        _isAlive            = false;
+        _isAlive = false;
+        if (_mana != null)
+        {
+            _mana.OnDepleted -= ReturnToPool;
+            _mana = null;
+        }
         _ctx                = null;
-        _mana               = null;
-        _onHit              = null;
-        _onUpdate           = null;
+        _item               = null;
         _data               = null;
         Rb2d.linearVelocity = Vector2.zero;
         base.OnDespawn();
@@ -142,33 +149,23 @@ public class SpellProjectile : Poolable
         SpellProjectilePool.Instance.Return(this);
     }
 
-    // SpellFunction(onHit, onUpdate)을 격리된 Interpreter로 실행한다.
-    // 마나는 시전자와 공유한다.
-    private void RunCallback(SpellFunction fn, List<object> args)
+    private void RunLifecycle(
+        System.Action<SpellContext, ManaTracker, Dictionary<string, object>> runner,
+        Dictionary<string, object> vars)
     {
-        if (_ctx == null || fn == null) return;
-
-        var extraVars = new Dictionary<string, object>();
-        for (int i = 0; i < fn.Params.Count && i < args.Count; i++)
-            extraVars[fn.Params[i]] = args[i];
-
-        var interp = new Interpreter(_ctx, _mana, extraVars);
+        if (_ctx == null) return;
         try
         {
-            interp.Run(fn.Body);
+            runner(_ctx, _mana, vars);
         }
-        catch (ReturnSignal)
-        {
-            // 콜백에서의 return은 무시
-        }
+        catch (ReturnSignal) { }
         catch (OutOfManaException)
         {
-            // 마나 부족 시 조용히 중단
             ReturnToPool();
         }
         catch (RuntimeException ex)
         {
-            Debug.LogWarning($"[SpellProjectile] 콜백 오류: {ex.Message}");
+            Debug.LogWarning($"[SpellProjectile] 라이프사이클 오류: {ex.Message}");
             ReturnToPool();
         }
     }

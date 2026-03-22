@@ -3,16 +3,13 @@ using UnityEngine.InputSystem;
 
 namespace Player
 {
-    public enum PlayerIdleState
+    public enum PlayerState
     {
         Idle,
-    }
-
-    public enum PlayerMoveState
-    {
         Move,
         Dash,
     }
+
     public class PlayerIdle : StateBase<Entity>
     {
         public PlayerIdle(Player caster) : base(caster)
@@ -42,6 +39,8 @@ namespace Player
         }
 
 
+
+
     }
 
     public class Player : Entity
@@ -60,9 +59,20 @@ namespace Player
             base.Start();
             // 초기 상태 설정
 
-            stateMachine.RegisterState(PlayerIdleState.Idle, new PlayerIdle(this));
         }
 
+        protected override void InitializeStateMachine()
+        {
+            base.InitializeStateMachine();
+
+            stateMachine.RegisterState(PlayerState.Idle, new PlayerIdle(this));
+            stateMachine.RegisterState(PlayerState.Move, new PlayerCompositeMove(this));
+
+            stateMachine.RegisterCondition(PlayerState.Idle, PlayerState.Move, () => InputHandler.MoveInput != Vector2.zero);
+            stateMachine.RegisterCondition(PlayerState.Move, PlayerState.Idle, () => InputHandler.MoveInput == Vector2.zero);
+
+
+        }
     }
 
 }

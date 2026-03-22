@@ -91,7 +91,109 @@ Entity (abstract, IDamagable)
 - `AttackStat` — `ATTACK_DISTANCE`, `ATTACK_SPEED`, `DAMAGE`
 - `Resource` — `ClampedFloat` 래퍼, `OnValueChanged` / `OnDepleted` / `OnFilled` 이벤트
 
-### 5. 마법 언어 시스템 (`SpellLanguage/`)
+### 5. 마법 스킬 시스템 (`SpellSkill`)
+
+플레이어가 버튼에 배치하여 발동하는 최상위 스킬 개념.
+
+#### SkillType
+
+| 타입 | 트리거 | 실행 슬롯 |
+|---|---|---|
+| `OneShot` | 버튼 1회 입력 | OnStart만 (1회) |
+| `Continuous` | 버튼 다운 / 홀드 / 업 | OnStart / OnUpdate(매프레임) / OnEnd |
+
+#### 슬롯 구조 (`SkillCodeSlot`)
+
+각 슬롯은 세 부분을 순서대로 실행한다.
+
+```
+// 1. 매개변수 주입 (자동 생성)
+let speed = 10;
+let direction = target.position - self.position;
+
+// 2. 고정 코드 (수정 불가 — 스킬의 핵심 동작)
+Fire(fireBolt, self.position, direction, speed)
+
+// 3. 플레이어 추가 코드 (자유 작성)
+Bolt(target, Fire, 10)
+```
+
+- `SkillParameter`: `Name`, `DefaultValue`, `Value` (DSL 표현식)
+- `SkillCodeSlot.BuildCode()`: 세 부분을 조합해 최종 DSL 코드 문자열 반환
+
+#### 마나 소진 시 자동 중단
+
+`RunOnStart` 시 `ManaTracker.OnDepleted` 구독 → 마나 소진 시 `Cancel()` 호출.
+`IsCancelled == true`이면 `RunOnUpdate`/`RunOnEnd` 즉시 반환.
+
+#### C# 사용 예시
+
+```csharp
+var skill = new SpellSkill
+{
+    Name = "FireShot",
+    Type = SkillType.OneShot,
+    OnStart = new SkillCodeSlot
+    {
+        LockedCode = "Fire(spellObj, self.position, direction, speed)",
+        Parameters = new List<SkillParameter>
+        {
+            new SkillParameter("spellObj",  "fireBolt"),
+            new SkillParameter("direction", "target.position - self.position"),
+            new SkillParameter("speed",     "10"),
+        },
+        UserCode = "" // 플레이어 작성
+    }
+};
+// 버튼 입력 시:
+skill.RunOnStart(ctx, mana);
+```
+
+---
+
+### 6. SpellEffectItem (SpellObject)
+
+월드에 생성되는 라이프사이클 오브젝트(투사체, 장판, 소환물 등)의 동작 정의.
+
+#### SpellEffectType
+
+```csharp
+public enum SpellEffectType
+{
+    SpellObject, // 월드에 생성되는 라이프사이클 오브젝트
+}
+```
+
+#### 슬롯별 주입 변수
+
+| 슬롯 | 주입 변수 |
+|---|---|
+| OnStart / OnUpdate | `self`, `proj` |
+| OnEnd | `self`, `proj`, `victim` |
+
+#### DSL 발동 명령어
+
+| 명령어 | 시그니처 | 설명 |
+|---|---|---|
+| `Fire` | `Fire(spellObj, startPos, direction, speed)` | SpellObject 발사/생성 |
+
+#### C# 사용 예시
+
+```csharp
+var fireBoltItem = new SpellEffectItem
+{
+    Name       = "FireBolt",
+    EffectType = SpellEffectType.SpellObject,
+    ManaCost   = 10f,
+    OnEndCode  = "Bolt(victim, Fire, power * 2)"
+};
+fireBoltItem.Compile();
+ctx.RegisterItem("fireBolt", fireBoltItem);
+```
+
+---
+
+### 6. 마법 언어 시스템 (`SpellLanguage/`)
 
 인게임 DSL 파이프라인:
 
@@ -102,16 +204,17 @@ Entity (abstract, IDamagable)
   → Interpreter  (AST 실행 + 마나 차감)
       ├── SpellEnvironment  변수 스코프 (블록별 Push/Pop)
       ├── ManaTracker       실시간 마나 차감, 부족 시 OutOfManaException
-      └── SpellContext      Entity 참조 + 명령어 레지스트리
+      └── SpellContext      Entity 참조 + 명령어 레지스트리 + 아이템 레지스트리
 ```
 
 #### DSL 네이밍 컨벤션
 
 | 종류 | 규칙 | 예 |
 |---|---|---|
-| 마법 명령어 | PascalCase | `Bolt`, `Heal`, `Explode` |
+| 마법 명령어 | PascalCase | `Bolt`, `Heal`, `Fire`, `Cast`, `ApplyEffect` |
 | 내장 수학 함수 | PascalCase | `Vec2`, `Abs`, `Distance`, `Min`, `Max`, `Sqrt` |
 | 속성 상수 | PascalCase | `Fire`, `Water`, `Lightning` |
+| 아이템 변수 | camelCase | `fireBolt`, `poisonCloud` |
 | 멤버 접근 | camelCase | `target.hp`, `target.maxHp`, `pos.x` |
 | 키워드 | lowercase | `if`, `else`, `while`, `loop`, `let`, `def`, `return` |
 
@@ -125,14 +228,16 @@ Entity (abstract, IDamagable)
 | `true`, `false` | `bool` |
 | `"text"` | `string` |
 | `Vec2(x, y)` | `Vector2` |
-| `self`, `target` | `Entity` |
+| `self`, `target`, `victim` | `Entity` |
 | `Fire`, `Water` … | `ElementType` |
+| `proj` | `SpellProjectileData` |
+| 등록된 SpellObject 변수 | `SpellEffectItem` |
 | `def`로 정의한 함수 | `SpellFunction` |
 
 #### 마나 비용 상수 (`ManaTracker`)
 
 `let`/`=` 1마나, `if` 2마나, `loop` 진입 2마나, `while` 반복당 1마나, 이항/단항 연산·멤버접근 1마나.
-마법 명령어(`Bolt` 등)의 비용은 각 명령어 구현에서 별도 정의.
+아이템 발동 비용은 `SpellEffectItem.ManaCost`에서 정의. 내부 명령어(`Bolt` 등) 비용은 각 구현에서 별도 정의.
 
 #### 엔티티 접근 가능 멤버
 
@@ -143,6 +248,11 @@ target.hpRatio     HP 비율 0~1 (double)
 target.moveSpeed   이동속도 (double)
 target.position    위치 (Vector2)
 
+proj.position      투사체 위치 (Vector2)
+proj.velocity      투사체 속도 벡터 (Vector2)
+proj.speed         투사체 속도 크기 (double)
+proj.damage        투사체 기본 데미지 (double)
+
 pos.x / pos.y      Vec2 좌표
 pos.magnitude      Vec2 크기
 ```
@@ -151,7 +261,7 @@ pos.magnitude      Vec2 크기
 
 | 티어 | 시작 여부 | 주요 명령어 |
 |---|---|---|
-| 0 | 처음부터 제공 | `Bolt`, `Heal`, `if`, `loop`, 기본 연산 |
+| 0 | 처음부터 제공 | `Bolt`, `Heal`, `Fire`, `if`, `loop`, 기본 연산 |
 | 1 | 해금 필요 | `Explode`, `Shield`, `while` |
 | 2 | 해금 필요 | `def` (함수 정의), 추가 명령어 |
 
@@ -165,8 +275,9 @@ pos.magnitude      Vec2 크기
 
 ```csharp
 var ctx = new SpellContext(playerEntity, targetEntity);
-SpellCommands.RegisterTier0(ctx);  // 게임 시작 시
-SpellCommands.RegisterTier1(ctx);  // 티어 1 해금 시
+SpellCommands.RegisterTier0(ctx);               // 게임 시작 시
+SpellCommands.RegisterTier1(ctx);               // 티어 1 해금 시
+ctx.RegisterItem("fireBolt", fireBoltItem);     // 아이템 획득 시
 var interp = new Interpreter(ctx, new ManaTracker(manaResource));
 interp.Run(parser.Parse());
 ```
@@ -180,6 +291,7 @@ Assets/02. Scripts/
 ├── Entity/
 │   ├── Element/          ElementType, ElementChart
 │   ├── Stat/             Stat<T>, DefaultStat, AttackStat, Resource
+│   ├── StatusEffect/     StatusEffect, Fear, Stun, ...
 │   ├── Entity.cs         추상 기반 (IDamagable, StateMachine, 속성)
 │   ├── IDamagable.cs
 │   └── IAttackable.cs
@@ -188,7 +300,8 @@ Assets/02. Scripts/
 └── SpellLanguage/
     ├── AST/              ASTNode (Expr), ASTStmt (Stmt)
     ├── Core/             Token, Lexer, Parser
-    ├── Interpreter/      Interpreter, SpellEnvironment, ManaTracker
-    ├── Runtime/          SpellContext
-    └── Commands/         SpellCommands (Bolt, Heal, Explode, Shield)
+    ├── Interpreter/      Interpreter, SpellEnvironment, ManaTracker (OnDepleted 이벤트)
+    ├── Runtime/          SpellContext, SpellEffectItem (SpellObject), SpellProjectileData
+    │                     SpellSkill (OneShot/Continuous), SkillCodeSlot, SkillParameter
+    └── Commands/         SpellCommands (Bolt, Heal, Fire, Explode, Shield)
 ```

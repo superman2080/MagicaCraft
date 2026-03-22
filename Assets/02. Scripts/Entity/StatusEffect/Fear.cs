@@ -5,7 +5,7 @@ public class Fear : StatusEffect
     public override StatusEffectType Type => StatusEffectType.HARD_CC;
 
     // 공포는 기절(Priority 0)보다 우선순위가 높다.
-    public override int Priority => 100;
+    public override int Priority => 2;
 
     public Fear(int level, float duration, Entity caster = null, params object[] datas) : base(level, duration, caster, datas)
     {

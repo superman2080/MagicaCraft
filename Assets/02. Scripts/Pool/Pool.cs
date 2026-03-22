@@ -4,75 +4,64 @@ using UnityEngine;
 public abstract class Pool<T> : MonoBehaviour where T : Poolable
 {
     public int initialSize = 10;
+    public T prefab;
 
-    private static T instance;
-    public static T Instance
+    private static Pool<T> instance;
+    public static Pool<T> Instance
     {
         get
         {
             if (instance == null)
             {
-                instance = (T)FindAnyObjectByType(typeof(T));
+                instance = (Pool<T>)FindAnyObjectByType(typeof(Pool<T>));
 
                 if (instance == null)
                 {
-                    GameObject obj = new GameObject(typeof(T).Name, typeof(T));
-                    GameObject poolObj = GameObject.Find("Pool") ?? new GameObject("Pool");
-
-                    instance = obj.GetComponent<T>();
-                    instance.transform.SetParent(poolObj.transform);
+                    Debug.LogError($"[Pool] {typeof(T).Name} Pool이 씬에 없습니다. Pool 오브젝트를 씬에 추가하세요.");
                 }
             }
             return instance;
         }
     }
 
-    private Queue<T> pool = new Queue<T>();
+    private Queue<T> pool = new();
 
-    public void Start()
+    protected virtual void Start()
     {
         for (int i = 0; i < initialSize; i++)
         {
-            T obj = Instantiate(Instance, transform);
+            var obj = CreateNew();
             obj.gameObject.SetActive(false);
             pool.Enqueue(obj);
         }
     }
 
+    protected virtual T CreateNew() => Instantiate(prefab, transform);
+
     public virtual T Get()
     {
-        if (pool.Count > 0)
-        {
-            T obj = pool.Dequeue();
-            obj.gameObject.SetActive(true);
-            obj.OnSpawn();
-            return obj;
-        }
-        else
-        {
-            T obj = Instantiate(Instance, transform);
-            obj.gameObject.SetActive(true);
-            return obj;
-        }
+        var obj = pool.Count > 0 ? pool.Dequeue() : CreateNew();
+        obj.OnSpawn();
+        return obj;
     }
 
     public virtual T Get(Vector3 position)
     {
-        T obj = Get();
+        var obj = Get();
         obj.transform.position = position;
         return obj;
     }
 
     public virtual T Get(Vector3 position, Quaternion rotation)
     {
-        T obj = Get(position);
+        var obj = Get(position);
         obj.transform.rotation = rotation;
         return obj;
     }
 
     public virtual T Get(Vector3 position, Quaternion rotation, Vector3 scale)
     {
-        T obj = Get(position, rotation);
+        var obj = Get(position, rotation);
         obj.transform.localScale = scale;
         return obj;
     }

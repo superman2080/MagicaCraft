@@ -1,6 +1,7 @@
 using System.Collections.Generic;
 using UnityEngine;
 using System.Linq;
+using System;
 
 public delegate void OnEffectEnterHandler(Entity sender, Entity target, StatusEffect effect);
 public delegate void OnEffectExecuteHandler(Entity sender, Entity target, StatusEffect effect);
@@ -31,6 +32,22 @@ public class StatusEffectHandler
     public StatusEffect GetEffect<T>() where T : StatusEffect
     {
         return statusEffects.Find(n => n is T);
+    }
+
+    public bool TryGetEffect<T>( out StatusEffect result) where T: StatusEffect
+    {
+        result = null;
+        if (statusEffects.Count == 0) return false;
+
+        for (int i = 0; i < statusEffects.Count; i++)
+        {
+            if (statusEffects[i] is T)
+            {
+                result = statusEffects[i];
+                return true;
+            }
+        }
+        return false;
     }
 
     public bool HasEffect<T>() where T : StatusEffect

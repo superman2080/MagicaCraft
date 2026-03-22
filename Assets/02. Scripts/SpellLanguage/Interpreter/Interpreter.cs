@@ -414,13 +414,14 @@ public class Interpreter
     {
         return val switch
         {
-            null          => "null",
-            bool b        => b ? "true" : "false",
-            double d      => d % 1 == 0 ? ((long)d).ToString() : d.ToString("F4"),
-            Vector2 v     => $"vec2({v.x:F2}, {v.y:F2})",
-            Entity en     => $"[Entity:{en.name}]",
-            SpellFunction f => $"[Function:{f.Name}]",
-            _             => val.ToString()
+            null             => "null",
+            bool b           => b ? "true" : "false",
+            double d         => d % 1 == 0 ? ((long)d).ToString() : d.ToString("F4"),
+            Vector2 v        => $"vec2({v.x:F2}, {v.y:F2})",
+            Entity en        => $"[Entity:{en.name}]",
+            SpellFunction f  => $"[Function:{f.Name}]",
+            SpellEffectItem i => $"[Effect:{i.Name}({i.EffectType})]",
+            _                => val.ToString()
         };
     }
 

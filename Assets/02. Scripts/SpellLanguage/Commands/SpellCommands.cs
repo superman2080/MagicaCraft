@@ -6,7 +6,7 @@ using UnityEngine;
 // SpellContext에 등록해 사용한다.
 //
 // 등록 예시 (게임 초기화 시):
-//   SpellCommands.RegisterAll(context);
+//   SpellCommands.RegisterTier0(context);
 //
 // 티어별 해금 예시:
 //   SpellCommands.RegisterTier0(context); // 시작 시
@@ -25,8 +25,6 @@ public static class SpellCommands
     public const float ManaCostExplodeRadiusMul = 0.5f;
     // Shield: 보호량 1당 소모 마나
     public const float ManaCostShieldPerAmount  = 0.7f;
-    // Fire: 투사체 피해량 1당 소모 마나 (Bolt보다 저렴 — 빗나갈 수 있으므로)
-    public const float ManaCostFirePerDamage    = 0.5f;
 
     // ─── 일괄 등록 헬퍼 ───────────────────────────────────────
 
@@ -52,8 +50,8 @@ public static class SpellCommands
     // 마나 비용: damage * ManaCostBoltPerDamage
     //
     // 사용 예:
-    //   Bolt(target, Fire, power * 1.5);
-    //   Bolt(target, None, 30);
+    //   Bolt(target, Fire, power * 1.5)
+    //   Bolt(victim, None, 30)
     private static object Bolt(List<object> args, SpellContext ctx, int line, int col)
     {
         const string sig = "Bolt(target, element, damage)";
@@ -75,8 +73,8 @@ public static class SpellCommands
     // 마나 비용: amount * ManaCostHealPerAmount
     //
     // 사용 예:
-    //   Heal(self, power * 0.5);
-    //   Heal(target, 20);
+    //   Heal(self, power * 0.5)
+    //   Heal(target, 20)
     private static object Heal(List<object> args, SpellContext ctx, int line, int col)
     {
         const string sig = "Heal(target, amount)";
@@ -92,60 +90,45 @@ public static class SpellCommands
         return null;
     }
 
-    // ─── 투사체 명령어 (티어 0) ──────────────────────────────
+    // ─── 아이템 명령어 (티어 0) ──────────────────────────────
 
-    // Fire(startPos, direction, element, damage, speed [, onHit [, onUpdate]])
+    // Fire(spellObj, startPos, direction, speed)
+    // SpellEffectItem(SpellObject)을 월드에 생성·발사한다.
+    // spellObj  — SpellEffectItem (인벤토리에서 등록된 SpellObject 아이템)
     // startPos  — 발사 위치 (Vec2 또는 Entity)
-    // direction — 발사 방향 벡터 (자동 정규화). 예: target.position - self.position
-    // element   — 기본 피격 속성 (onHit 없을 때 사용)
-    // damage    — 기본 피격 데미지 (onHit 없을 때 사용)
+    // direction — 발사 방향 벡터 (자동 정규화)
     // speed     — 이동 속도
-    // onHit     — (선택) def onHit(victim) { ... }  피격 시 실행
-    // onUpdate  — (선택) def onUpdate(proj) { ... } 매 프레임 실행 (유도·경로 변경)
     //
-    // 마나 비용: damage * ManaCostFirePerDamage
+    // 마나 비용: projItem.ManaCost
     //
     // 사용 예:
-    //   Fire(self.position, target.position - self.position, Fire, 50, 10)
-    //
-    //   def onHit(victim) { Explode(victim.position, 2, Fire, 30) }
-    //   Fire(self.position, target.position - self.position, Fire, 50, 10, onHit)
-    //
-    //   def onUpdate(proj) {
-    //     let dir = target.position - proj.position
-    //     SetVelocity(proj, dir * proj.speed)
-    //   }
-    //   Fire(self.position, target.position - self.position, Fire, 50, 10, onHit, onUpdate)
+    //   Fire(fireBolt, self.position, target.position - self.position, 10)
     private static object Fire(List<object> args, SpellContext ctx, int line, int col)
     {
-        const string sig = "Fire(startPos, direction, element, damage, speed [, onHit [, onUpdate]])";
+        const string sig = "Fire(projItem, startPos, direction, speed)";
 
-        if (args.Count < 5)
-            throw new RuntimeException($"{sig}: 최소 5개 인자 필요", line, col);
+        if (args.Count != 4)
+            throw new RuntimeException($"{sig}: 인자 4개 필요", line, col);
 
-        var   startPos  = RequireVector2(args[0], sig);
-        var   direction = RequireVector2(args[1], sig);
-        var   element   = RequireElement(args[2], sig);
-        float damage    = (float)RequireDouble(args[3], sig);
-        float speed     = (float)RequireDouble(args[4], sig);
+        var item      = RequireEffectItem(args[0], sig, SpellEffectType.SpellObject);
+        var startPos  = RequireVector2(args[1], sig);
+        var direction = RequireVector2(args[2], sig);
+        float speed   = (float)RequireDouble(args[3], sig);
 
-        SpellFunction onHit    = args.Count > 5 ? RequireFunction(args[5], sig) : null;
-        SpellFunction onUpdate = args.Count > 6 ? RequireFunction(args[6], sig) : null;
-
-        ctx.Mana.Spend(damage * ManaCostFirePerDamage, line, col);
+        ctx.Mana.Spend(item.ManaCost, line, col);
 
         if (SpellProjectilePool.Instance == null)
             throw new RuntimeException(
                 "SpellProjectilePool이 씬에 없습니다. Pool 오브젝트를 씬에 추가하세요.", line, col);
 
         var proj = SpellProjectilePool.Instance.Get();
-        proj.Init(ctx, ctx.Mana, startPos, direction, element, damage, speed, onHit, onUpdate);
+        proj.Init(ctx, ctx.Mana, startPos, direction, speed, item);
 
         return null;
     }
 
     // SetVelocity(proj, velocity)
-    // onUpdate 안에서 투사체 이동 방향·속도를 설정한다.
+    // OnUpdate 안에서 투사체 이동 방향·속도를 설정한다.
     // 예: SetVelocity(proj, Normalize(target.position - proj.position) * proj.speed)
     private static object SetVelocity(List<object> args, SpellContext ctx, int line, int col)
     {
@@ -185,10 +168,9 @@ public static class SpellCommands
     // Explode(center, radius, element, damage)
     // 지정 위치 주변 radius 범위 내 모든 적에게 속성 데미지를 준다.
     // 마나 비용: damage * (ManaCostExplodePerDamage + radius * ManaCostExplodeRadiusMul)
-    // → 반경이 넓을수록 비쌈
     //
-    // 사용 예:
-    //   Explode(target.position, 3, Fire, power);
+    // 사용 예 (아이템 OnEnd 코드 안에서):
+    //   Explode(victim.position, 3, Fire, 50)
     private static object Explode(List<object> args, SpellContext ctx, int line, int col)
     {
         const string sig = "Explode(center, radius, element, damage)";
@@ -204,8 +186,6 @@ public static class SpellCommands
         float manaCost = damage * (ManaCostExplodePerDamage + radius * ManaCostExplodeRadiusMul);
         ctx.Mana.Spend(manaCost, line, col);
 
-        // 반경 내 IDamagable 탐색 후 데미지 적용
-        // IAttackable을 구현한 경우 해당 레이어만, 아니면 전체 탐색
         var attacker  = ctx.Caster as IAttackable;
         var layerMask = attacker != null ? (int)attacker.AttackLayer : Physics2D.AllLayers;
         var hits      = Physics2D.OverlapCircleAll(center, radius, layerMask);
@@ -222,8 +202,8 @@ public static class SpellCommands
     // 대상에게 임시 HP 보호막을 부여한다. (구현은 Entity 확장 시 교체)
     // 마나 비용: amount * ManaCostShieldPerAmount
     //
-    // 사용 예:
-    //   Shield(self, power * 2);
+    // 사용 예 (아이템 OnStart 코드 안에서):
+    //   Shield(self, 100)
     private static object Shield(List<object> args, SpellContext ctx, int line, int col)
     {
         const string sig = "Shield(target, amount)";
@@ -267,9 +247,18 @@ public static class SpellCommands
         throw new RuntimeException($"{sig}: Vec2 또는 Entity 타입 인자가 필요합니다.");
     }
 
-    private static SpellFunction RequireFunction(object val, string sig)
+    // expectedType이 None이 아니면 타입 일치 여부를 검증한다.
+    private static SpellEffectItem RequireEffectItem(object val, string sig,
+                                                     SpellEffectType expectedType)
     {
-        if (val is SpellFunction fn) return fn;
-        throw new RuntimeException($"{sig}: def로 정의한 함수를 인자로 전달해야 합니다.");
+        if (val is not SpellEffectItem item)
+            throw new RuntimeException(
+                $"{sig}: SpellEffectItem이 필요합니다. ctx.RegisterItem()으로 등록 후 사용하세요.");
+
+        if (item.EffectType != expectedType)
+            throw new RuntimeException(
+                $"{sig}: {expectedType} 타입 아이템이 필요하지만 {item.EffectType} 타입이 전달되었습니다.");
+
+        return item;
     }
 }

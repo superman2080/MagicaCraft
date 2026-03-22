@@ -13,25 +13,36 @@ public enum HardCCStates
 {
     HardCC, // 복합 상태(CompositeStateBase) 키 — 메인 FSM에 등록
     Fear,   // 서브 상태 키 — HardCCState.SubStateMachine에 등록
-    Stun,   // 서브 상태 키 (Priority 0, 추후 구현)
+    Stun,   // 서브 상태 키 (Priority 1, 추후 구현)
 }
+
+public delegate void OnConcentrationEnterEventHandler(Entity entity);
+public delegate void OnConcentrationExecuteEventHandler(Entity entity);
+public delegate void OnConcentrationExitEventHandler(Entity entity);
 
 public class Concentration: StateBase<Entity>
 {
+    public OnConcentrationEnterEventHandler OnConcentrationEnter;
+    public OnConcentrationExecuteEventHandler OnConcentrationExecute;
+    public OnConcentrationExitEventHandler OnConcentrationExit;
+
     public Concentration(Entity caster) : base(caster)
     {
     }
     public override void Enter(Entity caster)
     {
+        OnConcentrationEnter?.Invoke(caster);
         base.Enter(caster);
     }
     public override void Execute(Entity caster)
     {
-        base.Execute(caster);
+        OnConcentrationExecute?.Invoke(caster);
         // 집중 상태에서의 행동 (예: 공격력 증가)
+        base.Execute(caster);
     }
     public override void Exit(Entity caster)
     {
+        OnConcentrationExit?.Invoke(caster);
         base.Exit(caster);
     }
 }
@@ -112,6 +123,7 @@ public class FearState : StateBase<Entity>
     public override void Execute(Entity caster)
     {
         base.Execute(caster);
+        caster.SpriteRenderer.color = Color.gray;
         // Stat<T>.InitStat()이 매 LateUpdate에서 배율을 1로 초기화하므로 매 프레임 재적용한다.
         caster.DefaultStat.Multiply(DefaultStatType.MOVE_SPEED, 0.5f);
     }
@@ -228,11 +240,9 @@ public abstract class Entity : MonoBehaviour, IDamagable
 
     protected virtual void InitializeStateMachine()
     {
-        var hardCCState = new HardCCState(this);
-
         stateMachine = new StateMachine<Entity>(this, EntryState);
         stateMachine.RegisterState(CommonState.Concentration, new Concentration(this));
-        stateMachine.RegisterState(HardCCStates.HardCC, hardCCState);
+        stateMachine.RegisterState(HardCCStates.HardCC, new HardCCState(this));
 
         // 어떤 상태에서든 HardCC 효과가 생기면 즉시 HardCCState로 전환
         stateMachine.RegisterAnyStateTransition(HardCCStates.HardCC,
