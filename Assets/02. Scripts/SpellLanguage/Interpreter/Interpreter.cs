@@ -133,6 +133,14 @@ public class Interpreter
     // 함수 정의 자체는 마나를 소비하지 않는다. 호출 시점에 마나를 소비한다.
     private void ExecuteDef(DefStmt s)
     {
+        // 명령어 또는 내장 함수와 동일한 이름으로 재정의하는 것을 차단한다.
+        if (_ctx.HasCommand(s.Name))
+            throw new RuntimeException(
+                $"'{s.Name}'은 마법 명령어이므로 재정의할 수 없습니다.", s.Line, s.Column);
+        if (_env.IsDefined(s.Name) && _env.Get(s.Name, s.Line, s.Column) is SpellBuiltin)
+            throw new RuntimeException(
+                $"'{s.Name}'은 내장 함수이므로 재정의할 수 없습니다.", s.Line, s.Column);
+
         _env.Define(s.Name, new SpellFunction(s.Name, s.Params, s.Body));
     }
 
@@ -252,6 +260,9 @@ public class Interpreter
             {
                 SpellFunction fn      => CallSpellFunction(fn, args, e.Line, e.Column),
                 SpellBuiltin  builtin => builtin.Call(args, e.Line, e.Column),
+                SpellObject   _       => throw new RuntimeException(
+                    $"'{name}'은 SpellObject이므로 직접 호출할 수 없습니다. Fire({name}, ...) 형태로 사용하세요.",
+                    e.Line, e.Column),
                 _ => throw new RuntimeException(
                         $"'{name}'은 호출 가능한 함수가 아닙니다.", e.Line, e.Column)
             };
@@ -420,7 +431,8 @@ public class Interpreter
             Vector2 v        => $"vec2({v.x:F2}, {v.y:F2})",
             Entity en        => $"[Entity:{en.name}]",
             SpellFunction f  => $"[Function:{f.Name}]",
-            SpellEffectItem i => $"[Effect:{i.Name}({i.EffectType})]",
+            SpellObject  o => $"[SpellObject:{o.Name}]",
+            SpellAction  a => $"[SpellAction:{a.DSLName}]",
             _                => val.ToString()
         };
     }

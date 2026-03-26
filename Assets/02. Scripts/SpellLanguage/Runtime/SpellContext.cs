@@ -19,10 +19,10 @@ public class SpellContext
     // value: (평가된 인자 목록, 컨텍스트, 줄번호, 열번호) → 반환값
     private readonly Dictionary<string, Func<List<object>, SpellContext, int, int, object>> _commands = new();
 
-    // 플레이어가 보유한 SpellEffectItem 레지스트리
-    // key  : DSL에서 참조할 변수명 (예: "fireBolt")
-    // value: SpellEffectItem 인스턴스
-    private readonly Dictionary<string, SpellEffectItem> _items = new();
+    // 플레이어가 보유한 SpellObject 레지스트리
+    // key  : DSL에서 참조할 변수명 (예: "basicBolt")
+    // value: SpellObject 인스턴스
+    private readonly Dictionary<string, SpellObject> _spellObjects = new();
 
     public SpellContext(Entity caster, Entity target)
     {
@@ -30,15 +30,15 @@ public class SpellContext
         Target = target;
     }
 
-    #region 아이템 등록
+    #region SpellObject 등록
 
-    // 플레이어 인벤토리의 SpellEffectItem을 DSL 변수로 등록한다.
+    // SpellObject를 DSL 변수로 등록한다.
     // 등록 후 인터프리터 생성 전에 호출해야 InjectBuiltins에서 반영된다.
-    // 예: ctx.RegisterItem("fireBolt", myItem) → DSL에서 Fire(fireBolt, ...) 사용 가능
-    public void RegisterItem(string name, SpellEffectItem item)
-        => _items[name] = item;
+    // 예: ctx.RegisterSpellObject("basicBolt", obj) → DSL에서 Fire(basicBolt, ...) 사용 가능
+    public void RegisterSpellObject(string name, SpellObject obj)
+        => _spellObjects[name] = obj;
 
-    public void UnregisterItem(string name) => _items.Remove(name);
+    public void UnregisterSpellObject(string name) => _spellObjects.Remove(name);
 
     #endregion
 
@@ -88,10 +88,10 @@ public class SpellContext
         env.Define("Light",     ElementType.Light);
         env.Define("Dark",      ElementType.Dark);
 
-        // 등록된 SpellEffectItem을 DSL 변수로 주입
-        // 예: ctx.RegisterItem("fireBolt", item) → DSL에서 fireBolt로 접근
-        foreach (var (name, item) in _items)
-            env.Define(name, item);
+        // 등록된 SpellObject를 DSL 변수로 주입
+        // 예: ctx.RegisterSpellObject("basicBolt", obj) → DSL에서 basicBolt로 접근
+        foreach (var (name, obj) in _spellObjects)
+            env.Define(name, obj);
     }
 
     #endregion

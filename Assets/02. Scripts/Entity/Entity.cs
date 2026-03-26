@@ -20,7 +20,7 @@ public delegate void OnConcentrationEnterEventHandler(Entity entity);
 public delegate void OnConcentrationExecuteEventHandler(Entity entity);
 public delegate void OnConcentrationExitEventHandler(Entity entity);
 
-public class Concentration: StateBase<Entity>
+public class Concentration: StateBase
 {
     public OnConcentrationEnterEventHandler OnConcentrationEnter;
     public OnConcentrationExecuteEventHandler OnConcentrationExecute;
@@ -29,21 +29,21 @@ public class Concentration: StateBase<Entity>
     public Concentration(Entity caster) : base(caster)
     {
     }
-    public override void Enter(Entity caster)
+    public override void Enter()
     {
         OnConcentrationEnter?.Invoke(caster);
-        base.Enter(caster);
+        base.Enter();
     }
-    public override void Execute(Entity caster)
+    public override void Execute()
     {
         OnConcentrationExecute?.Invoke(caster);
         // 집중 상태에서의 행동 (예: 공격력 증가)
-        base.Execute(caster);
+        base.Execute();
     }
-    public override void Exit(Entity caster)
+    public override void Exit()
     {
         OnConcentrationExit?.Invoke(caster);
-        base.Exit(caster);
+        base.Exit();
     }
 }
 
@@ -53,7 +53,7 @@ public class Concentration: StateBase<Entity>
 //   1. HardCCStates에 서브 상태 열거값 추가
 //   2. effectToState 딕셔너리에 (StatusEffect 타입, 열거값) 매핑 추가
 //   3. 생성자에서 SubStateMachine.RegisterState() 호출
-public class HardCCState : CompositeStateBase<Entity>
+public class HardCCState : CompositeStateBase
 {
     // StatusEffect 구체 타입 → HardCCStates 서브 상태 키 매핑
     private static readonly Dictionary<Type, HardCCStates> effectToState = new()
@@ -67,20 +67,20 @@ public class HardCCState : CompositeStateBase<Entity>
         SubStateMachine.RegisterState(HardCCStates.Fear, new FearState(entity));
     }
 
-    public override void Enter(Entity entity)
+    public override void Enter()
     {
         // Enter 전에 초기 서브 상태를 설정해 둔다 (Enter 중복 호출 방지를 위해 SetInitialState 사용)
-        var topKey = GetTopPriorityStateKey(entity);
+        var topKey = GetTopPriorityStateKey(caster);
         if (topKey.HasValue)
             SubStateMachine.SetInitialState(topKey.Value);
 
-        base.Enter(entity); // → SubStateMachine.Enter() → 서브 상태 Enter()
+        base.Enter(); // → SubStateMachine.Enter() → 서브 상태 Enter()
     }
 
-    public override void Execute(Entity entity)
+    public override void Execute()
     {
         // 매 프레임 최고 우선순위 HardCC 효과를 확인하고, 변경됐으면 서브 상태를 전환한다.
-        var topKey = GetTopPriorityStateKey(entity);
+        var topKey = GetTopPriorityStateKey(caster);
         if (topKey.HasValue)
         {
             var targetState = SubStateMachine.GetState(topKey.Value);
@@ -88,12 +88,12 @@ public class HardCCState : CompositeStateBase<Entity>
                 SubStateMachine.ChangeState(topKey.Value);
         }
 
-        base.Execute(entity); // → SubStateMachine.Update() → 서브 상태 Execute()
+        base.Execute(); // → SubStateMachine.Update() → 서브 상태 Execute()
     }
 
-    public override void Exit(Entity entity)
+    public override void Exit()
     {
-        base.Exit(entity); // → SubStateMachine.Exit() → 서브 상태 Exit()
+        base.Exit(); // → SubStateMachine.Exit() → 서브 상태 Exit()
     }
 
     private HardCCStates? GetTopPriorityStateKey(Entity entity)
@@ -107,39 +107,39 @@ public class HardCCState : CompositeStateBase<Entity>
     }
 }
 
-public class FearState : StateBase<Entity>
+public class FearState : StateBase
 {
     private Entity fearCaster;
 
     public FearState(Entity caster) : base(caster) { }
 
-    public override void Enter(Entity caster)
+    public override void Enter()
     {
-        base.Enter(caster);
+        base.Enter();
         fearCaster = caster.GetEffect<Fear>()?.Caster;
         caster.SpriteRenderer.color = Color.gray;
     }
 
-    public override void Execute(Entity caster)
+    public override void Execute()
     {
-        base.Execute(caster);
+        base.Execute();
         caster.SpriteRenderer.color = Color.gray;
         // Stat<T>.InitStat()이 매 LateUpdate에서 배율을 1로 초기화하므로 매 프레임 재적용한다.
         caster.DefaultStat.Multiply(DefaultStatType.MOVE_SPEED, 0.5f);
     }
 
-    public override void FixedExecute(Entity caster)
+    public override void FixedExecute()
     {
-        base.FixedExecute(caster);
+        base.FixedExecute();
         Vector2 direction = fearCaster
             ? (caster.transform.position - fearCaster.transform.position).normalized
             : Random.insideUnitCircle.normalized;
         caster.Rb2d.MovePosition((Vector2)caster.transform.position + direction * Time.fixedDeltaTime);
     }
 
-    public override void Exit(Entity caster)
+    public override void Exit()
     {
-        base.Exit(caster);
+        base.Exit();
         caster.SpriteRenderer.color = Color.white;
         // MOVE_SPEED 배율은 InitStat()이 다음 프레임에 자동으로 1로 복원한다.
     }
@@ -152,9 +152,9 @@ public abstract class Entity : MonoBehaviour, IDamagable
     public Collider2D Col { get; private set; }
     public SpriteRenderer SpriteRenderer { get; private set; }
 
-    public abstract StateBase<Entity> EntryState { get; }
-    public StateMachine<Entity> StateMachine => stateMachine;
-    protected StateMachine<Entity> stateMachine;
+    public abstract StateBase EntryState { get; }
+    public EntityStateMachine StateMachine => stateMachine;
+    protected EntityStateMachine stateMachine;
 
     public DefaultStat DefaultStat { get; protected set; }
 
@@ -223,6 +223,7 @@ public abstract class Entity : MonoBehaviour, IDamagable
     // protected virtual: 서브클래스에서 override 후 base.Update() 호출
     protected virtual void Update()
     {
+        if (stateMachine.CurState == null) return;
         stateMachine.Update();
     }
 
@@ -235,12 +236,14 @@ public abstract class Entity : MonoBehaviour, IDamagable
     // 물리 연산용 상태 업데이트
     protected virtual void FixedUpdate()
     {
+        if (stateMachine.CurState == null) return;
+
         stateMachine.FixedUpdate();
     }
 
     protected virtual void InitializeStateMachine()
     {
-        stateMachine = new StateMachine<Entity>(this, EntryState);
+        stateMachine = new EntityStateMachine(this, EntryState);
         stateMachine.RegisterState(CommonState.Concentration, new Concentration(this));
         stateMachine.RegisterState(HardCCStates.HardCC, new HardCCState(this));
 

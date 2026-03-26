@@ -10,42 +10,41 @@ using UnityEngine;
 //   2. 생성자에서 SubStateMachine에 자식 상태들을 등록한다.
 //   3. SetInitialState로 초기 자식 상태를 지정한다.
 //   4. 공통 로직은 Execute 등을 override하고 base.Execute()를 반드시 호출한다.
-public abstract class CompositeStateBase<T> : StateBase<T> where T : MonoBehaviour
+public abstract class CompositeStateBase : StateBase
 {
     // 자식 상태들을 관리하는 서브 스테이트 머신
-    public StateMachine<Entity> SubStateMachine { get; protected set; }
+    public EntityStateMachine SubStateMachine { get; protected set; }
 
     public CompositeStateBase(Entity caster): base(caster)
     {
-
-        SubStateMachine = new StateMachine<Entity>(caster);
+        SubStateMachine = new EntityStateMachine(caster);
     }
 
     // 진입: 부모 로직 실행 후 서브 머신의 초기 자식 상태 Enter 호출
-    public override void Enter(T caster)
+    public override void Enter()
     {
-        base.Enter(caster);
+        base.Enter();
         SubStateMachine.Enter();
     }
 
     // 업데이트: 부모 공통 로직 실행 후 서브 머신 Update 위임
-    public override void Execute(T caster)
+    public override void Execute()
     {
-        base.Execute(caster);
+        base.Execute();
         SubStateMachine.Update();
     }
 
     // 물리 업데이트: 부모 공통 로직 실행 후 서브 머신 FixedUpdate 위임
-    public override void FixedExecute(T caster)
+    public override void FixedExecute()
     {
-        base.FixedExecute(caster);
+        base.FixedExecute();
         SubStateMachine.FixedUpdate();
     }
 
     // 종료: 자식 상태 Exit 먼저 호출 후 부모 정리 (역순 보장)
-    public override void Exit(T caster)
+    public override void Exit()
     {
         SubStateMachine.Exit();
-        base.Exit(caster);
+        base.Exit();
     }
 }

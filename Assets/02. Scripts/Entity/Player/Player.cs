@@ -1,3 +1,5 @@
+using System;
+using System.Collections;
 using UnityEngine;
 using UnityEngine.InputSystem;
 
@@ -10,55 +12,92 @@ namespace Player
         Dash,
     }
 
-    public class PlayerIdle : StateBase<Entity>
+    public enum PlayerMoveState
+    {
+        Walk,
+        Dash
+    }
+
+    public class PlayerIdle : StateBase
     {
         public PlayerIdle(Player caster) : base(caster)
         {
         }
     }
 
-    public class PlayerCompositeMove : CompositeStateBase<Entity>
+    public class PlayerCompositeMove : CompositeStateBase
     {
-        public class PlayerMove : StateBase<Player>
-        {
-            public PlayerMove(Player caster) : base(caster)
-            {
-            }
-
-            public override void Execute(Player caster)
-            {
-                base.Execute(caster);
-
-            }
-        }
-
-
+        private Player player;
+        private PlayerDash dashState;
 
         public PlayerCompositeMove(Player caster) : base(caster)
         {
+            player = caster;
+            SubStateMachine.RegisterState(PlayerMoveState.Walk, new PlayerWalk(caster));
+            SubStateMachine.RegisterState(PlayerMoveState.Dash, new PlayerDash(caster));
+            dashState = SubStateMachine.GetState(PlayerMoveState.Dash) as PlayerDash;
+
+            SubStateMachine.RegisterAnyStateTransition(PlayerMoveState.Dash, () => player.InputHandler.DashPressed && dashState.dashCor == null);
         }
 
+        public class PlayerWalk : StateBase
+        {
+            private Player player;
+            public PlayerWalk(Player caster) : base(caster)
+            {
+                player = caster;
+            }
 
+            public override void FixedExecute()
+            {
+                base.FixedExecute();
+                caster.Rb2d.MovePosition(player.InputHandler.MoveInput * caster.DefaultStat.Get(DefaultStatType.MOVE_SPEED));
+            }
+        }
 
+        [Serializable]
+        public class DashConfig
+        {
+            public float dashSpeed;
+        }
+
+        public class PlayerDash: StateBase
+        {
+            public Coroutine dashCor;
+            private Player player;
+
+            public PlayerDash(Player caster) : base(caster)
+            {
+                player = caster;
+            }
+
+            public override void Enter()
+            {
+                base.Enter();
+                dashCor = player.StartCoroutine(DashCoroutine());
+            }
+
+            private IEnumerator DashCoroutine()
+            {
+                yield break;
+            }
+        }
 
     }
 
     public class Player : Entity
     {
-        public override StateBase<Entity> EntryState => throw new System.NotImplementedException();
+        [HideInInspector] public Animator animator;
+        public override StateBase EntryState => throw new System.NotImplementedException();
 
         public PlayerInputHandler InputHandler { get; private set; }
 
-        private void Awake()
-        {
-            InputHandler = GetComponent<PlayerInputHandler>();
-        }
-
         protected override void Start()
         {
+            InputHandler = GetComponent<PlayerInputHandler>();
+            animator = gameObject.GetComponent<Animator>();
             base.Start();
             // 초기 상태 설정
-
         }
 
         protected override void InitializeStateMachine()

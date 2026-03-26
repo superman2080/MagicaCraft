@@ -10,6 +10,9 @@ public class PlayerInputHandler : MonoBehaviour
     public bool LeftMouseButtonPressed { get; private set; }
     public bool RightMouseButtonPressed { get; private set; }
 
+    public bool DashPressed { get; private set; }
+    public bool JumpPressed { get; private set; }
+
 
     // Start is called once before the first execution of Update after the MonoBehaviour is created
     void Awake()
@@ -26,6 +29,20 @@ public class PlayerInputHandler : MonoBehaviour
 
         playerInput.Player.RightButton.performed += ctx => RightMouseButtonPressed = true;
         playerInput.Player.RightButton.canceled += ctx => RightMouseButtonPressed = false;
+
+        playerInput.Player.Dash.performed += ctx => DashPressed = true;
+        playerInput.Player.Jump.performed += ctx => JumpPressed = true;
+    }
+
+    private void OnEnable()
+    {
+        playerInput.Enable();
+    }
+
+    private void LateUpdate()
+    {
+        DashPressed = false;
+        JumpPressed = false;
     }
 
     private void OnDisable()

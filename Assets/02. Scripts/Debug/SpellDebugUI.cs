@@ -65,11 +65,12 @@ public class SpellDebugUI : MonoBehaviour
     // ─── 기본 예시 코드 ───────────────────────────────────────
 
     private const string DefaultCode =
-        "// 기본 투사체 예시\n" +
-        "def onHit(victim) {\n" +
-        "    Bolt(victim, Fire, 30)\n" +
-        "}\n" +
-        "Fire(self.position, Vec2(1, 0), Fire, 50, 10, onHit)\n";
+        "// 투사체 발사 예시 (basicBolt는 기본 등록된 ProjectileObject)\n" +
+        "Fire(basicBolt, self.position, Vec2(1, 0), 10)\n" +
+        "\n" +
+        "// Bolt / Heal 예시\n" +
+        "// Bolt(target, Fire, power)\n" +
+        "// Heal(self, 20)\n";
 
     // ─────────────────────────────────────────────────────────
     // Unity 생명주기
@@ -409,8 +410,9 @@ public class SpellDebugUI : MonoBehaviour
 
             // ── Context ───────────────────────────────────────
             var ctx = new SpellContext(caster, target);
-            SpellCommands.RegisterTier0(ctx);
-            SpellCommands.RegisterTier1(ctx);
+            var lib = SpellLibrary.CreateDefault();
+            lib.UnlockTier(1); // 디버그 콘솔은 모든 티어 해금
+            lib.ApplyToContext(ctx);
             RegisterDebugCommands(ctx);
 
             // ── Interpret ─────────────────────────────────────

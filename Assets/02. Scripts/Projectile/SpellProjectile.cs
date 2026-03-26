@@ -28,7 +28,7 @@ public class SpellProjectile : Poolable
 
     private SpellContext        _ctx;
     private ManaTracker         _mana;
-    private SpellEffectItem     _item;
+    private ProjectileObject    _projObj;
     private SpellProjectileData _data;
     private LayerMask           _attackLayer;
     private float               _spawnTime;
@@ -56,10 +56,10 @@ public class SpellProjectile : Poolable
             return;
         }
 
-        if (_item == null) return;
+        if (_projObj == null) return;
 
-        RunLifecycle(_item.RunOnUpdate,
-            new Dictionary<string, object> { ["proj"] = _data });
+        RunLifecycle(() => _projObj.RunUpdate(
+            _ctx, _mana, new Dictionary<string, object> { ["proj"] = _data }));
     }
 
     private void OnTriggerEnter2D(Collider2D other)
@@ -72,15 +72,16 @@ public class SpellProjectile : Poolable
 
         if (!other.TryGetComponent<IDamagable>(out var damagable)) return;
 
-        if (_item != null && other.TryGetComponent<Entity>(out var victim))
+        if (_projObj != null && other.TryGetComponent<Entity>(out var victim))
         {
-            // 아이템 OnEnd: proj + victim 주입
-            RunLifecycle(_item.RunOnEnd,
-                new Dictionary<string, object> { ["proj"] = _data, ["victim"] = victim });
+            // OnFinish: proj + victim 주입
+            RunLifecycle(() => _projObj.RunFinish(
+                _ctx, _mana,
+                new Dictionary<string, object> { ["proj"] = _data, ["victim"] = victim }));
         }
         else
         {
-            // 아이템 없을 때 기본 피격 처리
+            // projObj 없을 때 기본 피격 처리
             damagable.TakeDamage(_ctx?.Caster as IAttackable, Damage, Element);
         }
 
@@ -92,18 +93,18 @@ public class SpellProjectile : Poolable
     // Fire 명령어에서 호출. 투사체를 발사 상태로 설정하고 item.OnStart를 실행한다.
     // item이 null이면 element/damage를 이용한 기본 피격 처리가 사용된다.
     public void Init(
-        SpellContext    ctx,
-        ManaTracker     mana,
-        Vector2         startPos,
-        Vector2         direction,
-        float           speed,
-        SpellEffectItem item    = null,
-        ElementType     element = ElementType.None,
-        float           damage  = 0f)
+        SpellContext     ctx,
+        ManaTracker      mana,
+        Vector2          startPos,
+        Vector2          direction,
+        float            speed,
+        ProjectileObject projObj = null,
+        ElementType      element = ElementType.None,
+        float            damage  = 0f)
     {
         _ctx       = ctx;
         _mana      = mana;
-        _item      = item;
+        _projObj   = projObj;
         Speed      = speed;
         Element    = element;
         Damage     = damage;
@@ -121,9 +122,9 @@ public class SpellProjectile : Poolable
         _mana.OnDepleted += ReturnToPool;
 
         // OnStart 실행
-        if (_item != null)
-            RunLifecycle(_item.RunOnStart,
-                new Dictionary<string, object> { ["proj"] = _data });
+        if (_projObj != null)
+            RunLifecycle(() => _projObj.RunStart(
+                _ctx, _mana, new Dictionary<string, object> { ["proj"] = _data }));
     }
 
     public override void OnDespawn()
@@ -135,7 +136,7 @@ public class SpellProjectile : Poolable
             _mana = null;
         }
         _ctx                = null;
-        _item               = null;
+        _projObj            = null;
         _data               = null;
         Rb2d.linearVelocity = Vector2.zero;
         base.OnDespawn();
@@ -149,14 +150,12 @@ public class SpellProjectile : Poolable
         SpellProjectilePool.Instance.Return(this);
     }
 
-    private void RunLifecycle(
-        System.Action<SpellContext, ManaTracker, Dictionary<string, object>> runner,
-        Dictionary<string, object> vars)
+    private void RunLifecycle(System.Action runner)
     {
         if (_ctx == null) return;
         try
         {
-            runner(_ctx, _mana, vars);
+            runner();
         }
         catch (ReturnSignal) { }
         catch (OutOfManaException)

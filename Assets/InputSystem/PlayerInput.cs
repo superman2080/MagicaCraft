@@ -62,6 +62,24 @@ public partial class @PlayerInput: IInputActionCollection2, IDisposable
                     ""processors"": """",
                     ""interactions"": """",
                     ""initialStateCheck"": false
+                },
+                {
+                    ""name"": ""Dash"",
+                    ""type"": ""Button"",
+                    ""id"": ""8811474e-4ec0-48d5-b4d9-4bd653ac8ab5"",
+                    ""expectedControlType"": """",
+                    ""processors"": """",
+                    ""interactions"": """",
+                    ""initialStateCheck"": false
+                },
+                {
+                    ""name"": ""Jump"",
+                    ""type"": ""Button"",
+                    ""id"": ""265dcf79-dfbc-4ef3-a48d-6f5527f6017c"",
+                    ""expectedControlType"": """",
+                    ""processors"": """",
+                    ""interactions"": """",
+                    ""initialStateCheck"": false
                 }
             ],
             ""bindings"": [
@@ -150,6 +168,28 @@ public partial class @PlayerInput: IInputActionCollection2, IDisposable
                     ""processors"": """",
                     ""groups"": "";Keyboard"",
                     ""action"": ""RightButton"",
+                    ""isComposite"": false,
+                    ""isPartOfComposite"": false
+                },
+                {
+                    ""name"": """",
+                    ""id"": ""a0099d2c-6d6a-49bf-8078-751223bf15d4"",
+                    ""path"": ""<Keyboard>/leftShift"",
+                    ""interactions"": """",
+                    ""processors"": """",
+                    ""groups"": "";Keyboard"",
+                    ""action"": ""Dash"",
+                    ""isComposite"": false,
+                    ""isPartOfComposite"": false
+                },
+                {
+                    ""name"": """",
+                    ""id"": ""dcf1eb1b-ba75-4954-b0b7-09ecb752b366"",
+                    ""path"": ""<Keyboard>/space"",
+                    ""interactions"": """",
+                    ""processors"": """",
+                    ""groups"": "";Keyboard"",
+                    ""action"": ""Jump"",
                     ""isComposite"": false,
                     ""isPartOfComposite"": false
                 }
@@ -686,6 +726,8 @@ public partial class @PlayerInput: IInputActionCollection2, IDisposable
         m_Player_MousePos = m_Player.FindAction("MousePos", throwIfNotFound: true);
         m_Player_LeftButton = m_Player.FindAction("LeftButton", throwIfNotFound: true);
         m_Player_RightButton = m_Player.FindAction("RightButton", throwIfNotFound: true);
+        m_Player_Dash = m_Player.FindAction("Dash", throwIfNotFound: true);
+        m_Player_Jump = m_Player.FindAction("Jump", throwIfNotFound: true);
         // UI
         m_UI = asset.FindActionMap("UI", throwIfNotFound: true);
         m_UI_Navigate = m_UI.FindAction("Navigate", throwIfNotFound: true);
@@ -769,6 +811,8 @@ public partial class @PlayerInput: IInputActionCollection2, IDisposable
     private readonly InputAction m_Player_MousePos;
     private readonly InputAction m_Player_LeftButton;
     private readonly InputAction m_Player_RightButton;
+    private readonly InputAction m_Player_Dash;
+    private readonly InputAction m_Player_Jump;
     public struct PlayerActions
     {
         private @PlayerInput m_Wrapper;
@@ -777,6 +821,8 @@ public partial class @PlayerInput: IInputActionCollection2, IDisposable
         public InputAction @MousePos => m_Wrapper.m_Player_MousePos;
         public InputAction @LeftButton => m_Wrapper.m_Player_LeftButton;
         public InputAction @RightButton => m_Wrapper.m_Player_RightButton;
+        public InputAction @Dash => m_Wrapper.m_Player_Dash;
+        public InputAction @Jump => m_Wrapper.m_Player_Jump;
         public InputActionMap Get() { return m_Wrapper.m_Player; }
         public void Enable() { Get().Enable(); }
         public void Disable() { Get().Disable(); }
@@ -798,6 +844,12 @@ public partial class @PlayerInput: IInputActionCollection2, IDisposable
             @RightButton.started += instance.OnRightButton;
             @RightButton.performed += instance.OnRightButton;
             @RightButton.canceled += instance.OnRightButton;
+            @Dash.started += instance.OnDash;
+            @Dash.performed += instance.OnDash;
+            @Dash.canceled += instance.OnDash;
+            @Jump.started += instance.OnJump;
+            @Jump.performed += instance.OnJump;
+            @Jump.canceled += instance.OnJump;
         }
 
         private void UnregisterCallbacks(IPlayerActions instance)
@@ -814,6 +866,12 @@ public partial class @PlayerInput: IInputActionCollection2, IDisposable
             @RightButton.started -= instance.OnRightButton;
             @RightButton.performed -= instance.OnRightButton;
             @RightButton.canceled -= instance.OnRightButton;
+            @Dash.started -= instance.OnDash;
+            @Dash.performed -= instance.OnDash;
+            @Dash.canceled -= instance.OnDash;
+            @Jump.started -= instance.OnJump;
+            @Jump.performed -= instance.OnJump;
+            @Jump.canceled -= instance.OnJump;
         }
 
         public void RemoveCallbacks(IPlayerActions instance)
@@ -964,6 +1022,8 @@ public partial class @PlayerInput: IInputActionCollection2, IDisposable
         void OnMousePos(InputAction.CallbackContext context);
         void OnLeftButton(InputAction.CallbackContext context);
         void OnRightButton(InputAction.CallbackContext context);
+        void OnDash(InputAction.CallbackContext context);
+        void OnJump(InputAction.CallbackContext context);
     }
     public interface IUIActions
     {
