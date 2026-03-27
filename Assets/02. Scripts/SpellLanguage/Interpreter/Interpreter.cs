@@ -523,6 +523,13 @@ public class Interpreter
                 throw new RuntimeException("Normalize(vec): 인자 1개 필요", line, col);
             return (object)ToVector2(args[0], line, col).normalized;
         }));
+
+        _env.Define("GetMousePosition", new SpellBuiltin((args, line, col) =>
+        {
+            if (args.Count != 0)
+                throw new RuntimeException("GetMousePosition(): 인자 필요 없음", line, col);
+            return ToVector2(Camera.main.ScreenToWorldPoint(Input.mousePosition), line, col);
+        }));
     }
 }
 

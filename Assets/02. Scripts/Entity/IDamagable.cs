@@ -7,6 +7,8 @@ public delegate void OnDiedHandler(IDamagable sender, IAttackable caster);
 public interface IDamagable
 {
     DefaultStat DefaultStat { get; }
+    DefaultStatData DefaultStatData { get; }
+
     float HP { get; }
 
     // element 미지정 시 None(배율 1.0)으로 처리되어 기존 호출과 호환된다.

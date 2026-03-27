@@ -132,12 +132,39 @@ public class Resource
 
     public static implicit operator float(Resource self) => self.CurrentValue;
 }
+
 public abstract class Stat<T> where T : Enum
 {
+    public abstract StatData<T> StatData { get;  }
     public Dictionary<T, float> defaultStat = new Dictionary<T, float>();
     public Dictionary<T, float> addValue = new Dictionary<T, float>();
     public Dictionary<T, float> multipleValue = new Dictionary<T, float>();
     public Dictionary<T, float> currentValue = new Dictionary<T, float>();
+
+    // Ω∫≈» µ•¿Ã≈Õ ∆ƒΩÃ
+
+    public Stat(StatData<T> statData)
+    {
+        InitStatData(StatData);
+    }
+
+    protected virtual void InitStatData(StatData<T> statData)
+    {
+        var dict = statData.StatDict;
+        foreach (var key in dict.Keys)
+        {
+            if(dict.TryGetValue(key, out float val))
+            {
+                defaultStat[key] = val;
+            }
+            else
+            {
+                Debug.LogAssertion($"This key does not exist! key: {key.ToString()}");
+                defaultStat[key] = 1;
+            }
+        }
+    }
+
     public virtual void Update()
     {
         UpdateStat();
@@ -179,6 +206,8 @@ public abstract class Stat<T> where T : Enum
     }
 }
 
+
+[Serializable]
 public class DefaultStat : Stat<DefaultStatType>
 {
     public Resource HP;
@@ -197,7 +226,8 @@ public class DefaultStat : Stat<DefaultStatType>
         HP = new Resource(maxHP, hpRegen);
     }
 
-    public DefaultStat() : this(100, 0, 1) { }
+    public override StatData<DefaultStatType> StatData => DefaultStatData;
+    [SerializeField] private DefaultStatData DefaultStatData;
 
     public override void SetDefault(DefaultStatType type, float defaultVal)
     {
@@ -215,8 +245,13 @@ public class DefaultStat : Stat<DefaultStatType>
         HP.Tick(Time.deltaTime);
     }
 }
+
+
+[Serializable]
 public class AttackStat : Stat<WeaponStatType>
 {
+    public override StatData<WeaponStatType> StatData => throw new NotImplementedException();
+
     public AttackStat(float dist, float speed, float damage)
     {
         defaultStat = new Dictionary<WeaponStatType, float>()

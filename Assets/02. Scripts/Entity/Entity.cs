@@ -165,6 +165,9 @@ public abstract class Entity : MonoBehaviour, IDamagable
     [SerializeField] private ElementType[] affinities = { ElementType.None };
     public IReadOnlyList<ElementType> Affinities => affinities;
 
+    public DefaultStatData DefaultStatData => defaultStatData;
+    [SerializeField] private DefaultStatData defaultStatData;
+
     // 공격 속성에 대한 최종 데미지 배율을 계산한다.
     public float GetDamageMultiplier(ElementType attackElement)
         => ElementChart.GetMultiplier(attackElement, affinities);
@@ -243,7 +246,7 @@ public abstract class Entity : MonoBehaviour, IDamagable
 
     protected virtual void InitializeStateMachine()
     {
-        stateMachine = new EntityStateMachine(this, EntryState);
+        stateMachine = new EntityStateMachine(this);
         stateMachine.RegisterState(CommonState.Concentration, new Concentration(this));
         stateMachine.RegisterState(HardCCStates.HardCC, new HardCCState(this));
 
@@ -254,5 +257,8 @@ public abstract class Entity : MonoBehaviour, IDamagable
         // HardCC 효과가 모두 해제되면 EntryState로 복귀
         stateMachine.RegisterCondition(HardCCStates.HardCC, EntryState,
             () => !statusEffectHandler.HasEffect(StatusEffectType.HARD_CC));
+
+        if(EntryState != null)
+            stateMachine.ChangeState(EntryState);
     }
 }

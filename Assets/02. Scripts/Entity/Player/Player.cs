@@ -1,7 +1,6 @@
 using System;
 using System.Collections;
 using UnityEngine;
-using UnityEngine.InputSystem;
 
 namespace Player
 {
@@ -85,10 +84,11 @@ namespace Player
 
     }
 
+    [RequireComponent(typeof(PlayerInputHandler))]
     public class Player : Entity
     {
         [HideInInspector] public Animator animator;
-        public override StateBase EntryState => throw new System.NotImplementedException();
+        public override StateBase EntryState => StateMachine.GetState(PlayerState.Idle);
 
         public PlayerInputHandler InputHandler { get; private set; }
 
@@ -107,8 +107,8 @@ namespace Player
             stateMachine.RegisterState(PlayerState.Idle, new PlayerIdle(this));
             stateMachine.RegisterState(PlayerState.Move, new PlayerCompositeMove(this));
 
-            stateMachine.RegisterCondition(PlayerState.Idle, PlayerState.Move, () => InputHandler.MoveInput != Vector2.zero);
-            stateMachine.RegisterCondition(PlayerState.Move, PlayerState.Idle, () => InputHandler.MoveInput == Vector2.zero);
+            stateMachine.RegisterCondition(PlayerState.Idle, PlayerState.Move, () => InputHandler.MoveInput != Vector2.zero || InputHandler.JumpPressed == true);
+            stateMachine.RegisterCondition(PlayerState.Move, PlayerState.Idle, () => InputHandler.MoveInput == Vector2.zero && InputHandler.JumpPressed == false);
 
 
         }
