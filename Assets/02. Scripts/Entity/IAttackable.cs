@@ -5,6 +5,7 @@ public delegate void OnAttackHandler(IAttackable sender, IDamagable target, floa
 public interface IAttackable
 {
     AttackStat AttackStat { get; }
+    AttackStatDataSO AttackStatData { get; }
 
     LayerMask AttackLayer { get; }
 

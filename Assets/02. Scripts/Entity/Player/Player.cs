@@ -14,7 +14,8 @@ namespace Player
     public enum PlayerMoveState
     {
         Walk,
-        Dash
+        Dash,
+        Jump
     }
 
     public class PlayerIdle : StateBase
@@ -34,9 +35,20 @@ namespace Player
             player = caster;
             SubStateMachine.RegisterState(PlayerMoveState.Walk, new PlayerWalk(caster));
             SubStateMachine.RegisterState(PlayerMoveState.Dash, new PlayerDash(caster));
+
+
             dashState = SubStateMachine.GetState(PlayerMoveState.Dash) as PlayerDash;
 
-            SubStateMachine.RegisterAnyStateTransition(PlayerMoveState.Dash, () => player.InputHandler.DashPressed && dashState.dashCor == null);
+            SubStateMachine.RegisterCondition(PlayerMoveState.Walk, PlayerMoveState.Dash, () => player.InputHandler.DashPressed && dashState.dashCor == null);
+            SubStateMachine.RegisterCondition(PlayerMoveState.Dash, PlayerMoveState.Walk, () => player.InputHandler.DashPressed == false 
+            && dashState.dashCor != null);
+        }
+
+        public override void Enter()
+        {
+            base.Enter();
+            
+            SubStateMachine.ChangeState(PlayerMoveState.Walk);
         }
 
         public class PlayerWalk : StateBase
@@ -50,20 +62,23 @@ namespace Player
             public override void FixedExecute()
             {
                 base.FixedExecute();
-                caster.Rb2d.MovePosition(player.InputHandler.MoveInput * caster.DefaultStat.Get(DefaultStatType.MOVE_SPEED));
+                float moveDelta = caster.DefaultStat.Get(DefaultStatType.MOVE_SPEED) * Time.fixedDeltaTime;
+                caster.Rb2d.MovePosition(caster.Rb2d.position + player.InputHandler.MoveInput * moveDelta);
             }
         }
 
         [Serializable]
         public class DashConfig
         {
-            public float dashSpeed;
+            [Tooltip("´ë½¬")] public AnimationCurve dashSpeed = AnimationCurve.Linear(0, 1, 1, 0);
+            public float dashTime;
         }
 
         public class PlayerDash: StateBase
         {
             public Coroutine dashCor;
             private Player player;
+            private DashConfig dashConfig;
 
             public PlayerDash(Player caster) : base(caster)
             {
@@ -73,24 +88,28 @@ namespace Player
             public override void Enter()
             {
                 base.Enter();
-                dashCor = player.StartCoroutine(DashCoroutine());
-            }
-
-            private IEnumerator DashCoroutine()
-            {
-                yield break;
+                //dashCor = player.StartCoroutine(DashCoroutine());
             }
         }
 
     }
 
     [RequireComponent(typeof(PlayerInputHandler))]
-    public class Player : Entity
+    public class Player : Entity, IAttackable
     {
         [HideInInspector] public Animator animator;
-        public override StateBase EntryState => StateMachine.GetState(PlayerState.Idle);
+        public override Enum EntryStateKey => entryStateKey;
+        [SerializeField] private PlayerState entryStateKey;
 
         public PlayerInputHandler InputHandler { get; private set; }
+
+        public AttackStat AttackStat => attackStat;
+        [SerializeField] private AttackStat attackStat;
+
+        public AttackStatDataSO AttackStatData => attackStatData;
+        [SerializeField] private AttackStatDataSO attackStatData;
+
+        public LayerMask AttackLayer => 1 << LayerMask.NameToLayer("Enemy") | LayerMask.NameToLayer("Entity");
 
         protected override void Start()
         {
@@ -103,14 +122,21 @@ namespace Player
         protected override void InitializeStateMachine()
         {
             base.InitializeStateMachine();
-
             stateMachine.RegisterState(PlayerState.Idle, new PlayerIdle(this));
             stateMachine.RegisterState(PlayerState.Move, new PlayerCompositeMove(this));
 
             stateMachine.RegisterCondition(PlayerState.Idle, PlayerState.Move, () => InputHandler.MoveInput != Vector2.zero || InputHandler.JumpPressed == true);
             stateMachine.RegisterCondition(PlayerState.Move, PlayerState.Idle, () => InputHandler.MoveInput == Vector2.zero && InputHandler.JumpPressed == false);
+        }
 
+        protected override void Update()
+        {
+            base.Update();
+        }
 
+        public void Attack(IDamagable target, float amount)
+        {
+            throw new NotImplementedException();
         }
     }
 

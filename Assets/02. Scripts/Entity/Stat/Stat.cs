@@ -2,7 +2,7 @@ using System;
 using System.Collections.Generic;
 using UnityEngine;
 
-public enum WeaponStatType
+public enum AttackStatType
 {
     ATTACK_SPEED,
     DAMAGE,
@@ -141,14 +141,17 @@ public abstract class Stat<T> where T : Enum
     public Dictionary<T, float> multipleValue = new Dictionary<T, float>();
     public Dictionary<T, float> currentValue = new Dictionary<T, float>();
 
-    // ½ºÅÈ µ¥ÀÌÅÍ ÆÄ½Ì
+    // ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ ï¿½Ä½ï¿½
 
     public Stat(StatData<T> statData)
     {
-        InitStatData(StatData);
+        InitStatData(statData);
+
+        InitStat();
+        UpdateStat();
     }
 
-    protected virtual void InitStatData(StatData<T> statData)
+    private void InitStatData(StatData<T> statData)
     {
         var dict = statData.StatDict;
         foreach (var key in dict.Keys)
@@ -212,22 +215,15 @@ public class DefaultStat : Stat<DefaultStatType>
 {
     public Resource HP;
 
-    public DefaultStat(float maxHP, float hpRegen, float moveSpeed)
+    public DefaultStat(StatData<DefaultStatType> statData): base(statData)
     {
-        defaultStat = new Dictionary<DefaultStatType, float>()
-        {
-            [DefaultStatType.MAX_HP] = maxHP,
-            [DefaultStatType.HP_REGEN] = hpRegen,
-            [DefaultStatType.MOVE_SPEED] = moveSpeed,
-        };
-        currentValue = new Dictionary<DefaultStatType, float>(defaultStat);
-        InitStat();
-        UpdateStat();
-        HP = new Resource(maxHP, hpRegen);
+        var dict = statData.StatDict;
+        HP = new Resource(dict[DefaultStatType.MAX_HP], dict[DefaultStatType.HP_REGEN]);
     }
 
+
     public override StatData<DefaultStatType> StatData => DefaultStatData;
-    [SerializeField] private DefaultStatData DefaultStatData;
+    [SerializeField] private DefaultStatDataSO DefaultStatData;
 
     public override void SetDefault(DefaultStatType type, float defaultVal)
     {
@@ -248,21 +244,11 @@ public class DefaultStat : Stat<DefaultStatType>
 
 
 [Serializable]
-public class AttackStat : Stat<WeaponStatType>
+public class AttackStat : Stat<AttackStatType>
 {
-    public override StatData<WeaponStatType> StatData => throw new NotImplementedException();
+    public override StatData<AttackStatType> StatData => throw new NotImplementedException();
 
-    public AttackStat(float dist, float speed, float damage)
+    public AttackStat(StatData<AttackStatType> statType): base(statType)
     {
-        defaultStat = new Dictionary<WeaponStatType, float>()
-        {
-            [WeaponStatType.ATTACK_DISTANCE] = dist,
-            [WeaponStatType.ATTACK_SPEED] = speed,
-            [WeaponStatType.DAMAGE] = damage,
-        };
-        currentValue = new Dictionary<WeaponStatType, float>(defaultStat);
-        InitStat();
-        UpdateStat();
     }
-    public AttackStat() : this(2, 1, 25) { }
 }

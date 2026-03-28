@@ -152,21 +152,22 @@ public abstract class Entity : MonoBehaviour, IDamagable
     public Collider2D Col { get; private set; }
     public SpriteRenderer SpriteRenderer { get; private set; }
 
-    public abstract StateBase EntryState { get; }
+    public abstract Enum EntryStateKey { get; }
     public EntityStateMachine StateMachine => stateMachine;
     protected EntityStateMachine stateMachine;
 
-    public DefaultStat DefaultStat { get; protected set; }
+    public DefaultStat DefaultStat => defaultStat;
+    private DefaultStat defaultStat;
 
-    public float HP => DefaultStat.HP.CurrentValue;
+    public float HP => defaultStat.HP.CurrentValue;
 
     // 엔티티의 속성 (이중 속성 지원)
     // Inspector에서 설정하거나 서브클래스 생성자에서 지정한다.
     [SerializeField] private ElementType[] affinities = { ElementType.None };
     public IReadOnlyList<ElementType> Affinities => affinities;
 
-    public DefaultStatData DefaultStatData => defaultStatData;
-    [SerializeField] private DefaultStatData defaultStatData;
+    public DefaultStatDataSO DefaultStatData => defaultStatData;
+    [SerializeField] private DefaultStatDataSO defaultStatData;
 
     // 공격 속성에 대한 최종 데미지 배율을 계산한다.
     public float GetDamageMultiplier(ElementType attackElement)
@@ -215,11 +216,14 @@ public abstract class Entity : MonoBehaviour, IDamagable
         Rb2d = gameObject.GetComponent<Rigidbody2D>();
         Col = gameObject.GetComponent<Collider2D>();
         SpriteRenderer = gameObject.GetComponent<SpriteRenderer>();
+        defaultStat = new DefaultStat(defaultStatData);
         statusEffectHandler = new StatusEffectHandler(this);
 
         #region StateMachine
+        stateMachine = new EntityStateMachine(this);
         InitializeStateMachine();
-
+        if (EntryStateKey != null)
+            stateMachine.ChangeState(EntryStateKey);
         #endregion
     }
 
@@ -240,13 +244,12 @@ public abstract class Entity : MonoBehaviour, IDamagable
     protected virtual void FixedUpdate()
     {
         if (stateMachine.CurState == null) return;
-
         stateMachine.FixedUpdate();
     }
 
     protected virtual void InitializeStateMachine()
     {
-        stateMachine = new EntityStateMachine(this);
+
         stateMachine.RegisterState(CommonState.Concentration, new Concentration(this));
         stateMachine.RegisterState(HardCCStates.HardCC, new HardCCState(this));
 
@@ -255,10 +258,9 @@ public abstract class Entity : MonoBehaviour, IDamagable
             () => statusEffectHandler.HasEffect(StatusEffectType.HARD_CC));
 
         // HardCC 효과가 모두 해제되면 EntryState로 복귀
-        stateMachine.RegisterCondition(HardCCStates.HardCC, EntryState,
+        stateMachine.RegisterCondition(HardCCStates.HardCC, EntryStateKey,
             () => !statusEffectHandler.HasEffect(StatusEffectType.HARD_CC));
 
-        if(EntryState != null)
-            stateMachine.ChangeState(EntryState);
+
     }
 }
