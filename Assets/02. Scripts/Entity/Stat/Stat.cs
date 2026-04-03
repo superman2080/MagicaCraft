@@ -8,10 +8,15 @@ public enum AttackStatType
     DAMAGE,
     ATTACK_DISTANCE,
 }
-public enum DefaultStatType
+
+public enum HealthStatType
 {
     MAX_HP,
     HP_REGEN,
+}
+
+public enum MoveStatType
+{
     MOVE_SPEED,
     JUMP_FORCE,
 }
@@ -136,7 +141,6 @@ public class Resource
 
 public abstract class Stat<T> where T : Enum
 {
-    public abstract StatData<T> StatData { get;  }
     public Dictionary<T, float> defaultStat = new Dictionary<T, float>();
     public Dictionary<T, float> addValue = new Dictionary<T, float>();
     public Dictionary<T, float> multipleValue = new Dictionary<T, float>();
@@ -210,25 +214,21 @@ public abstract class Stat<T> where T : Enum
 
 
 [Serializable]
-public class DefaultStat : Stat<DefaultStatType>
+public class HealthStat : Stat<HealthStatType>
 {
     public Resource HP;
 
-    public DefaultStat(StatData<DefaultStatType> statData): base(statData)
+    public HealthStat(StatData<HealthStatType> statData) : base(statData)
     {
         var dict = statData.StatDict;
-        HP = new Resource(dict[DefaultStatType.MAX_HP], dict[DefaultStatType.HP_REGEN]);
+        HP = new Resource(dict[HealthStatType.MAX_HP], dict[HealthStatType.HP_REGEN]);
     }
 
-
-    public override StatData<DefaultStatType> StatData => DefaultStatData;
-    [SerializeField] private DefaultStatDataSO DefaultStatData;
-
-    public override void SetDefault(DefaultStatType type, float defaultVal)
+    public override void SetDefault(HealthStatType type, float defaultVal)
     {
-        if(type == DefaultStatType.MAX_HP)
+        if (type == HealthStatType.MAX_HP)
         {
-            float oldMaxHP = defaultStat[DefaultStatType.MAX_HP];
+            float oldMaxHP = defaultStat[HealthStatType.MAX_HP];
             HP.OnMaxValueChanged(oldMaxHP, defaultVal, keepRatio: true);
         }
         base.SetDefault(type, defaultVal);
@@ -243,10 +243,18 @@ public class DefaultStat : Stat<DefaultStatType>
 
 
 [Serializable]
+public class MoveStat : Stat<MoveStatType>
+{
+
+    public MoveStat(StatData<MoveStatType> statData) : base(statData)
+    {
+    }
+}
+
+
+[Serializable]
 public class AttackStat : Stat<AttackStatType>
 {
-    public override StatData<AttackStatType> StatData => throw new NotImplementedException();
-
     public AttackStat(StatData<AttackStatType> statType): base(statType)
     {
     }

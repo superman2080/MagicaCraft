@@ -125,7 +125,7 @@ public class FearState : StateBase
         base.Execute();
         caster.SpriteRenderer.color = Color.gray;
         // Stat<T>.InitStat()이 매 LateUpdate에서 배율을 1로 초기화하므로 매 프레임 재적용한다.
-        caster.DefaultStat.Multiply(DefaultStatType.MOVE_SPEED, 0.5f);
+        (caster as IMovable)?.MoveStat.Multiply(MoveStatType.MOVE_SPEED, 0.5f);
     }
 
     public override void FixedExecute()
@@ -156,18 +156,18 @@ public abstract class Entity : MonoBehaviour, IDamagable
     public EntityStateMachine StateMachine => stateMachine;
     protected EntityStateMachine stateMachine;
 
-    public DefaultStat DefaultStat => defaultStat;
-    private DefaultStat defaultStat;
+    public HealthStat HealthStat => healthStat;
+    private HealthStat healthStat;
 
-    public float HP => defaultStat.HP.CurrentValue;
+    public float HP => healthStat.HP.CurrentValue;
 
     // 엔티티의 속성 (이중 속성 지원)
     // Inspector에서 설정하거나 서브클래스 생성자에서 지정한다.
     [SerializeField] private ElementType[] affinities = { ElementType.None };
     public IReadOnlyList<ElementType> Affinities => affinities;
 
-    public DefaultStatDataSO DefaultStatData => defaultStatData;
-    [SerializeField] private DefaultStatDataSO defaultStatData;
+    public HealthStatDataSO HealthStatData => healthStatData;
+    [SerializeField] private HealthStatDataSO healthStatData;
 
     // 공격 속성에 대한 최종 데미지 배율을 계산한다.
     public float GetDamageMultiplier(ElementType attackElement)
@@ -198,8 +198,8 @@ public abstract class Entity : MonoBehaviour, IDamagable
         float finalAmount = Mathf.Abs(amount) * multiplier;
 
         OnTakeDamage?.Invoke(this, caster, finalAmount);
-        DefaultStat.HP.Subtract(finalAmount);
-        if (DefaultStat.HP.IsEmpty)
+        healthStat.HP.Subtract(finalAmount);
+        if (healthStat.HP.IsEmpty)
         {
             OnDied?.Invoke(this, caster);
         }
@@ -207,7 +207,7 @@ public abstract class Entity : MonoBehaviour, IDamagable
 
     public virtual void Heal(Entity caster, float amount)
     {
-        DefaultStat.HP.Add(Mathf.Abs(amount));
+        healthStat.HP.Add(Mathf.Abs(amount));
     }
 
     // protected virtual: 서브클래스에서 override 후 base.Start() 호출
@@ -216,7 +216,7 @@ public abstract class Entity : MonoBehaviour, IDamagable
         Rb2d = gameObject.GetComponent<Rigidbody2D>();
         Col = gameObject.GetComponent<Collider2D>();
         SpriteRenderer = gameObject.GetComponent<SpriteRenderer>();
-        defaultStat = new DefaultStat(defaultStatData);
+        healthStat = new HealthStat(healthStatData);
         statusEffectHandler = new StatusEffectHandler(this);
 
         #region StateMachine
@@ -237,7 +237,7 @@ public abstract class Entity : MonoBehaviour, IDamagable
     protected virtual void LateUpdate()
     {
         statusEffectHandler.UpdateEffect();
-        DefaultStat.Update();
+        healthStat.Update();
     }
 
     // 물리 연산용 상태 업데이트

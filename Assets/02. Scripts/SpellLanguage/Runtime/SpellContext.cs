@@ -75,7 +75,7 @@ public class SpellContext
         env.Define("target", (object)Target);
 
         // TODO: 전용 power(공격력) 스탯 추가 시 이 줄을 교체
-        env.Define("power", (double)Caster.DefaultStat.Get(DefaultStatType.MAX_HP) * 0.25);
+        env.Define("power", (double)Caster.HealthStat.Get(HealthStatType.MAX_HP) * 0.25);
 
         // 속성 상수 - 식별자로 직접 사용 (예: Bolt(target, Fire, 30))
         env.Define("None",      ElementType.None);

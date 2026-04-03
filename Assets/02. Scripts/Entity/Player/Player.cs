@@ -1,5 +1,6 @@
 using System;
 using System.Collections;
+using UnityEditor;
 using UnityEngine;
 
 namespace PlayerNamespace
@@ -8,7 +9,6 @@ namespace PlayerNamespace
     {
         Idle,
         Move,
-        Dash,
     }
 
     public enum PlayerMoveState
@@ -47,19 +47,26 @@ namespace PlayerNamespace
             SubStateMachine.RegisterState(PlayerMoveState.Jump, new PlayerJump(caster));
 
             dashState = SubStateMachine.GetState(PlayerMoveState.Dash) as PlayerDash;
-            jumpState = SubStateMachine.GetState(PlayerMoveState.Jump) as PlayerJump;
 
-            SubStateMachine.RegisterCondition(PlayerMoveState.Walk, PlayerMoveState.Dash, () => player.InputHandler.DashPressed && dashState.dashCor == null);
-            SubStateMachine.RegisterCondition(PlayerMoveState.Dash, PlayerMoveState.Walk, () => player.InputHandler.DashPressed == false
-            && dashState.dashCor != null);
-            SubStateMachine.RegisterAnyStateTransition(PlayerMoveState.Jump, () => player.InputHandler.JumpPressed && jumpState.isGrounded == true);
+            SubStateMachine.RegisterCondition(PlayerMoveState.Walk, PlayerMoveState.Dash, 
+                () => player.InputHandler.DashPressed && dashState.dashCor == null);
+            SubStateMachine.RegisterCondition(PlayerMoveState.Dash, PlayerMoveState.Walk, 
+                () => player.InputHandler.DashPressed == false && dashState.dashCor != null);
+
+            SubStateMachine.RegisterCondition(PlayerMoveState.Walk, PlayerMoveState.Jump, () => player.InputHandler.JumpPressed && player.IsGrounded);
+            SubStateMachine.RegisterCondition(PlayerMoveState.Jump, PlayerMoveState.Walk, () => player.IsGrounded && caster.Rb2d.linearVelocity.y <= 0f);
         }
 
         public override void Enter()
         {
             base.Enter();
-
             SubStateMachine.ChangeState(PlayerMoveState.Walk);
+        }
+
+        public override void Execute()
+        {
+            base.Execute();
+            Debug.Log(SubStateMachine.CurState.ToString());
         }
 
         public class PlayerWalk : StateBase
@@ -73,7 +80,7 @@ namespace PlayerNamespace
             public override void FixedExecute()
             {
                 base.FixedExecute();
-                float moveSpeed = caster.DefaultStat.Get(DefaultStatType.MOVE_SPEED);
+                float moveSpeed = player.MoveStat.Get(MoveStatType.MOVE_SPEED);
 
                 Vector2 vel = caster.Rb2d.linearVelocity;
                 vel.x = player.InputHandler.MoveInput.x * moveSpeed;
@@ -108,39 +115,23 @@ namespace PlayerNamespace
 
         public class PlayerJump : StateBase
         {
-            public bool isGrounded = true;
+            private Player player;
 
             public PlayerJump(Player caster) : base(caster)
             {
+                player = caster;
             }
 
             public override void Enter()
             {
                 base.Enter();
-                Vector2 vel = caster.Rb2d.linearVelocity;
-                vel.y = caster.DefaultStat.Get(DefaultStatType.JUMP_FORCE);
-                caster.Rb2d.AddForce(vel, ForceMode2D.Impulse);
-            }
-
-            public override void FixedExecute()
-            {
-                base.FixedExecute();
-                var col = caster.Col as BoxCollider2D;
-                Vector2 feetPos = (Vector2)caster.transform.position
-                                  + col.offset
-                                  + Vector2.down * (col.size.y / 2f + 0.05f);
-                isGrounded = Physics2D.OverlapBox(
-                    feetPos,
-                    new Vector2(col.size.x - 0.1f, 0.1f),
-                    0f,
-                    LayerMask.GetMask("Ground")
-                );
+                caster.Rb2d.AddForce(Vector2.up * player.MoveStat.Get(MoveStatType.JUMP_FORCE), ForceMode2D.Impulse);
             }
         }
     }
 
-    [RequireComponent(typeof(PlayerInputHandler))]
-    public class Player : Entity, IAttackable
+    [RequireComponent(typeof(PlayerInputHandler)), RequireComponent(typeof(Animator))]
+    public class Player : Entity, IAttackable, IMovable
     {
         [HideInInspector] public Animator animator;
         public override Enum EntryStateKey => entryStateKey;
@@ -148,19 +139,51 @@ namespace PlayerNamespace
 
         public PlayerInputHandler InputHandler { get; private set; }
 
+
+        #region Stat & StatDatas
         public AttackStat AttackStat => attackStat;
         [SerializeField] private AttackStat attackStat;
 
         public AttackStatDataSO AttackStatData => attackStatData;
         [SerializeField] private AttackStatDataSO attackStatData;
 
+        public MoveStat MoveStat => moveStat;
+        private MoveStat moveStat;
+
+        public MoveStatDataSO MoveStatData => moveStatData;
+        [SerializeField] private MoveStatDataSO moveStatData;
+
+        #endregion
+
         public LayerMask AttackLayer => 1 << LayerMask.NameToLayer("Enemy") | LayerMask.NameToLayer("Entity");
+
+        private int groundContactCount = 0;
+        public bool IsGrounded => groundContactCount > 0;
+
+        private void OnCollisionEnter2D(Collision2D col)
+        {
+            if (col.gameObject.layer == LayerMask.NameToLayer("Ground"))
+                groundContactCount++;
+        }
+
+        private void OnCollisionExit2D(Collision2D col)
+        {
+            if (col.gameObject.layer == LayerMask.NameToLayer("Ground"))
+                groundContactCount--;
+        }
 
         protected override void Start()
         {
             InputHandler = GetComponent<PlayerInputHandler>();
             animator = gameObject.GetComponent<Animator>();
             base.Start();
+            moveStat = new MoveStat(moveStatData);
+        }
+
+        protected override void LateUpdate()
+        {
+            base.LateUpdate();
+            moveStat.Update();
         }
 
         protected override void InitializeStateMachine()
@@ -170,12 +193,7 @@ namespace PlayerNamespace
             stateMachine.RegisterState(PlayerState.Move, new PlayerCompositeMove(this));
 
             stateMachine.RegisterCondition(PlayerState.Idle, PlayerState.Move, () => InputHandler.MoveInput != Vector2.zero || InputHandler.JumpPressed == true);
-            stateMachine.RegisterCondition(PlayerState.Move, PlayerState.Idle, () => InputHandler.MoveInput == Vector2.zero && InputHandler.JumpPressed == false);
-        }
-
-        protected override void Update()
-        {
-            base.Update();
+            stateMachine.RegisterCondition(PlayerState.Move, PlayerState.Idle, () => InputHandler.MoveInput == Vector2.zero && InputHandler.JumpPressed == false && IsGrounded);
         }
 
         public void Attack(IDamagable target, float amount)

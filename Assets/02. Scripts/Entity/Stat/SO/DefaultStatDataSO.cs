@@ -1,9 +1,7 @@
-using System;
 using UnityEngine;
 
-[CreateAssetMenu(fileName = "DefaultStatDataSO", menuName = "Scriptable Objects/StatDatas/DefaultStatDataSO")]
-[Serializable]
-public class DefaultStatDataSO : StatData<DefaultStatType>
+[CreateAssetMenu(fileName = "HealthStatDataSO", menuName = "Scriptable Objects/StatDatas/HealthStatDataSO")]
+public class HealthStatDataSO : StatData<HealthStatType>
 {
 
 }

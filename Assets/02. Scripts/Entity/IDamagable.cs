@@ -6,8 +6,8 @@ public delegate void OnDiedHandler(IDamagable sender, IAttackable caster);
 
 public interface IDamagable
 {
-    DefaultStat DefaultStat { get; }
-    DefaultStatDataSO DefaultStatData { get; }
+    HealthStat HealthStat { get; }
+    HealthStatDataSO HealthStatData { get; }
 
     float HP { get; }
 

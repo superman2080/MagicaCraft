@@ -220,9 +220,9 @@ public class Interpreter
         return member switch
         {
             "hp"        => (double)entity.HP,
-            "maxHp"     => (double)entity.DefaultStat.HP.MaxValue,
-            "hpRatio"   => (double)entity.DefaultStat.HP.Ratio,
-            "moveSpeed" => (double)entity.DefaultStat.Get(DefaultStatType.MOVE_SPEED),
+            "maxHp"     => (double)entity.HealthStat.HP.MaxValue,
+            "hpRatio"   => (double)entity.HealthStat.HP.Ratio,
+            "moveSpeed" => (double?)(entity as IMovable)?.MoveStat.Get(MoveStatType.MOVE_SPEED) ?? 0.0,
             "position"  => entity.Rb2d != null ? (object)entity.Rb2d.position : Vector2.zero,
             _ => throw new RuntimeException($"Entity에 '{member}' 필드가 없습니다.", line, col)
         };

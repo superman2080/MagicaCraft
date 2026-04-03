@@ -133,6 +133,7 @@ GameObject:
   - component: {fileID: 174610028}
   - component: {fileID: 174610027}
   - component: {fileID: 174610030}
+  - component: {fileID: 174610031}
   m_Layer: 0
   m_Name: Player
   m_TagString: Untagged
@@ -262,10 +263,11 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   affinities: 00000000
-  defaultStatData: {fileID: 11400000, guid: 127c475b757777d4c8433e2b8c1e3485, type: 2}
+  healthStatData: {fileID: 11400000, guid: bd3c4017c07e8ff45a4db991834e6af6, type: 2}
   animator: {fileID: 0}
   entryStateKey: 0
   attackStatData: {fileID: 11400000, guid: c19bebc8f2e1c624aa0f45b68b384934, type: 2}
+  moveStatData: {fileID: 11400000, guid: e1611f8451ea1f64da6cf513c1912b0b, type: 2}
 --- !u!61 &174610030
 BoxCollider2D:
   m_ObjectHideFlags: 0
@@ -312,6 +314,28 @@ BoxCollider2D:
   m_AutoTiling: 0
   m_Size: {x: 1, y: 1}
   m_EdgeRadius: 0
+--- !u!95 &174610031
+Animator:
+  serializedVersion: 7
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 174610021}
+  m_Enabled: 1
+  m_Avatar: {fileID: 0}
+  m_Controller: {fileID: 0}
+  m_CullingMode: 0
+  m_UpdateMode: 0
+  m_ApplyRootMotion: 0
+  m_LinearVelocityBlending: 0
+  m_StabilizeFeet: 0
+  m_AnimatePhysics: 0
+  m_WarningMessage: 
+  m_HasTransformHierarchy: 1
+  m_AllowConstantClipSamplingOptimization: 1
+  m_KeepAnimatorStateOnDisable: 0
+  m_WriteDefaultValuesOnDisable: 0
 --- !u!1 &519420028
 GameObject:
   m_ObjectHideFlags: 0
