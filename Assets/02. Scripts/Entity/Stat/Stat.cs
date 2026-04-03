@@ -13,6 +13,7 @@ public enum DefaultStatType
     MAX_HP,
     HP_REGEN,
     MOVE_SPEED,
+    JUMP_FORCE,
 }
 
 [Serializable]
@@ -140,8 +141,6 @@ public abstract class Stat<T> where T : Enum
     public Dictionary<T, float> addValue = new Dictionary<T, float>();
     public Dictionary<T, float> multipleValue = new Dictionary<T, float>();
     public Dictionary<T, float> currentValue = new Dictionary<T, float>();
-
-    // ���� ������ �Ľ�
 
     public Stat(StatData<T> statData)
     {

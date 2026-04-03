@@ -2,7 +2,7 @@ using System;
 using System.Collections;
 using UnityEngine;
 
-namespace Player
+namespace PlayerNamespace
 {
     public enum PlayerState
     {
@@ -23,31 +23,42 @@ namespace Player
         public PlayerIdle(Player caster) : base(caster)
         {
         }
+
+        public override void FixedExecute()
+        {
+            base.FixedExecute();
+            Vector2 vel = caster.Rb2d.linearVelocity;
+            vel.x = 0f;
+            caster.Rb2d.linearVelocity = vel;
+        }
     }
 
     public class PlayerCompositeMove : CompositeStateBase
     {
         private Player player;
         private PlayerDash dashState;
+        private PlayerJump jumpState;
 
         public PlayerCompositeMove(Player caster) : base(caster)
         {
             player = caster;
             SubStateMachine.RegisterState(PlayerMoveState.Walk, new PlayerWalk(caster));
             SubStateMachine.RegisterState(PlayerMoveState.Dash, new PlayerDash(caster));
-
+            SubStateMachine.RegisterState(PlayerMoveState.Jump, new PlayerJump(caster));
 
             dashState = SubStateMachine.GetState(PlayerMoveState.Dash) as PlayerDash;
+            jumpState = SubStateMachine.GetState(PlayerMoveState.Jump) as PlayerJump;
 
             SubStateMachine.RegisterCondition(PlayerMoveState.Walk, PlayerMoveState.Dash, () => player.InputHandler.DashPressed && dashState.dashCor == null);
-            SubStateMachine.RegisterCondition(PlayerMoveState.Dash, PlayerMoveState.Walk, () => player.InputHandler.DashPressed == false 
+            SubStateMachine.RegisterCondition(PlayerMoveState.Dash, PlayerMoveState.Walk, () => player.InputHandler.DashPressed == false
             && dashState.dashCor != null);
+            SubStateMachine.RegisterAnyStateTransition(PlayerMoveState.Jump, () => player.InputHandler.JumpPressed && jumpState.isGrounded == true);
         }
 
         public override void Enter()
         {
             base.Enter();
-            
+
             SubStateMachine.ChangeState(PlayerMoveState.Walk);
         }
 
@@ -62,19 +73,22 @@ namespace Player
             public override void FixedExecute()
             {
                 base.FixedExecute();
-                float moveDelta = caster.DefaultStat.Get(DefaultStatType.MOVE_SPEED) * Time.fixedDeltaTime;
-                caster.Rb2d.MovePosition(caster.Rb2d.position + player.InputHandler.MoveInput * moveDelta);
+                float moveSpeed = caster.DefaultStat.Get(DefaultStatType.MOVE_SPEED);
+
+                Vector2 vel = caster.Rb2d.linearVelocity;
+                vel.x = player.InputHandler.MoveInput.x * moveSpeed;
+                caster.Rb2d.linearVelocity = vel;
             }
         }
 
         [Serializable]
         public class DashConfig
         {
-            [Tooltip("´ë½¬")] public AnimationCurve dashSpeed = AnimationCurve.Linear(0, 1, 1, 0);
+            [Tooltip("ëŒ€ì‹œ")] public AnimationCurve dashSpeed = AnimationCurve.Linear(0, 1, 1, 0);
             public float dashTime;
         }
 
-        public class PlayerDash: StateBase
+        public class PlayerDash : StateBase
         {
             public Coroutine dashCor;
             private Player player;
@@ -92,6 +106,37 @@ namespace Player
             }
         }
 
+        public class PlayerJump : StateBase
+        {
+            public bool isGrounded = true;
+
+            public PlayerJump(Player caster) : base(caster)
+            {
+            }
+
+            public override void Enter()
+            {
+                base.Enter();
+                Vector2 vel = caster.Rb2d.linearVelocity;
+                vel.y = caster.DefaultStat.Get(DefaultStatType.JUMP_FORCE);
+                caster.Rb2d.AddForce(vel, ForceMode2D.Impulse);
+            }
+
+            public override void FixedExecute()
+            {
+                base.FixedExecute();
+                var col = caster.Col as BoxCollider2D;
+                Vector2 feetPos = (Vector2)caster.transform.position
+                                  + col.offset
+                                  + Vector2.down * (col.size.y / 2f + 0.05f);
+                isGrounded = Physics2D.OverlapBox(
+                    feetPos,
+                    new Vector2(col.size.x - 0.1f, 0.1f),
+                    0f,
+                    LayerMask.GetMask("Ground")
+                );
+            }
+        }
     }
 
     [RequireComponent(typeof(PlayerInputHandler))]
@@ -116,7 +161,6 @@ namespace Player
             InputHandler = GetComponent<PlayerInputHandler>();
             animator = gameObject.GetComponent<Animator>();
             base.Start();
-            // ÃÊ±â »óÅÂ ¼³Á¤
         }
 
         protected override void InitializeStateMachine()
@@ -139,5 +183,4 @@ namespace Player
             throw new NotImplementedException();
         }
     }
-
 }

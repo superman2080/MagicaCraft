@@ -24,9 +24,7 @@ public abstract class ActiveSkillBase
 
     public abstract void Perform();
 
-    protected virtual void Enter() {
-        
-    }
+    protected virtual void Enter() { }
 
     protected virtual void Execute() { }
     protected virtual void Exit() { }

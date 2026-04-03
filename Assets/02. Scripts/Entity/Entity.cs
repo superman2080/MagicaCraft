@@ -249,7 +249,6 @@ public abstract class Entity : MonoBehaviour, IDamagable
 
     protected virtual void InitializeStateMachine()
     {
-
         stateMachine.RegisterState(CommonState.Concentration, new Concentration(this));
         stateMachine.RegisterState(HardCCStates.HardCC, new HardCCState(this));
 
