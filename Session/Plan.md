@@ -23,12 +23,14 @@ public enum MoveStatType
 }
 ```
 
-**주의**: 추가 후 `MoveStatDataSO` 에셋에 새 키가 자동 등록됨.
-Inspector에서 값을 설정해야 런타임에 사용 가능 (코드 외 작업, 사용자 확인 필요).
+**주의**: `MoveStatDataSO` 에셋에서 Inspector로 `DASH_SPEED` 값 설정 필요 (코드 외 작업).
+`Stat<T>` 생성자의 `InitStatData`는 StatData에 없는 키를 건너뛰기 때문에,
+에셋에 값이 없으면 `Get(DASH_SPEED)` 시 KeyNotFoundException 발생.
+→ 에셋 설정은 구현 완료 후 사용자가 직접 수행.
 
 ---
 
-### [대기] 단계 2 — `Player`에 `dashConfig`, `facingDirection` 추가
+### [대기] 단계 2 — `Player`에 `dashConfig`, `FacingDirection`, `IsDashing` 추가
 
 **파일**: `Assets/02. Scripts/Entity/Player/Player.cs`
 
@@ -38,44 +40,64 @@ Inspector에서 값을 설정해야 런타임에 사용 가능 (코드 외 작�
 [SerializeField] private PlayerCompositeMove.DashConfig dashConfig;
 public PlayerCompositeMove.DashConfig DashConfig => dashConfig;
 
-private float facingDirection = 1f;
-public float FacingDirection => facingDirection;
+public float FacingDirection { get; set; } = 1f;
+public bool IsDashing { get; set; } = false;
 ```
 
-`PlayerWalk.FixedExecute()`에서 방향 업데이트:
+`PlayerWalk.FixedExecute()`에서 방향 업데이트 추가:
 
 ```csharp
 public override void FixedExecute()
 {
     base.FixedExecute();
     float moveSpeed = player.MoveStat.Get(MoveStatType.MOVE_SPEED);
+
     Vector2 vel = caster.Rb2d.linearVelocity;
     vel.x = player.InputHandler.MoveInput.x * moveSpeed;
     caster.Rb2d.linearVelocity = vel;
 
     // 이동 중이면 facing 방향 갱신
     if (player.InputHandler.MoveInput.x != 0f)
-        player.facingDirection = Mathf.Sign(player.InputHandler.MoveInput.x);
+        player.FacingDirection = Mathf.Sign(player.InputHandler.MoveInput.x);
 }
 ```
 
-> `facingDirection`은 `Player`에서 직접 접근하므로 `private` → `internal` 또는 프로퍼티 setter 활용.
-> `Player` 클래스가 같은 파일이므로 `private`으로도 중첩 클래스에서 접근 가능 — 확인 필요.
+> `FacingDirection`과 `IsDashing`은 같은 네임스페이스 내 중첩 클래스(PlayerWalk, PlayerDash)가 접근해야 하므로 public 프로퍼티로 선언.
 
 ---
 
-### [대기] 단계 3 — `PlayerDash` 전체 구현
+### [대기] 단계 3 — Move→Idle 전환 조건에 `!IsDashing` 추가
+
+**파일**: `Assets/02. Scripts/Entity/Player/Player.cs`
+**위치**: `Player.InitializeStateMachine()`
+
+대시 중 `MoveInput == Vector2.zero` 상태(입력 없이 대시 중)가 되면
+현재 조건이 즉시 참이 되어 Idle로 전환되어 코루틴이 중단되는 버그 방지.
+
+```csharp
+// 변경 전
+stateMachine.RegisterCondition(PlayerState.Move, PlayerState.Idle,
+    () => InputHandler.MoveInput == Vector2.zero && InputHandler.JumpPressed == false && IsGrounded && Rb2d.linearVelocity.y <= 0f);
+
+// 변경 후
+stateMachine.RegisterCondition(PlayerState.Move, PlayerState.Idle,
+    () => InputHandler.MoveInput == Vector2.zero && InputHandler.JumpPressed == false && IsGrounded && Rb2d.linearVelocity.y <= 0f && !IsDashing);
+```
+
+---
+
+### [대기] 단계 4 — `PlayerDash` 전체 구현
 
 **파일**: `Assets/02. Scripts/Entity/Player/Player.cs`
 
-`PlayerDash` 생성자에 `DashConfig` 전달:
+`PlayerCompositeMove` 생성자에서 `DashConfig` 전달:
 
 ```csharp
 SubStateMachine.RegisterState(PlayerMoveState.Dash, new PlayerDash(caster, caster.DashConfig));
 dashState = SubStateMachine.GetState(PlayerMoveState.Dash) as PlayerDash;
 ```
 
-`PlayerDash` 클래스 구현:
+`PlayerDash` 클래스 전체 교체:
 
 ```csharp
 public class PlayerDash : StateBase
@@ -94,17 +116,19 @@ public class PlayerDash : StateBase
     public override void Enter()
     {
         base.Enter();
-        // 입력 방향 우선, 없으면 facing 방향
+        // 입력 방향 우선, 없으면 마지막 facing 방향
         dashDir = player.InputHandler.MoveInput.x != 0f
             ? Mathf.Sign(player.InputHandler.MoveInput.x)
             : player.FacingDirection;
 
+        player.IsDashing = true;
         dashCor = player.StartCoroutine(DashCoroutine());
     }
 
     public override void Exit()
     {
         base.Exit();
+        player.IsDashing = false;
         if (dashCor != null)
         {
             player.StopCoroutine(dashCor);
@@ -131,19 +155,20 @@ public class PlayerDash : StateBase
         }
 
         dashCor = null;  // 종료 → Dash→Walk 조건 충족
+        player.IsDashing = false;
     }
 }
 ```
 
 ---
 
-### [대기] 단계 4 — Dash→Walk 전환 조건 수정
+### [대기] 단계 5 — Dash→Walk 전환 조건 수정
 
-**파일**: `Assets/02. Scripts/Entity/Player/Player.cs`  
+**파일**: `Assets/02. Scripts/Entity/Player/Player.cs`
 **위치**: `PlayerCompositeMove` 생성자
 
 ```csharp
-// 변경 전 (버그)
+// 변경 전 (버그: DashPressed는 다음 프레임에 이미 false)
 SubStateMachine.RegisterCondition(PlayerMoveState.Dash, PlayerMoveState.Walk,
     () => player.InputHandler.DashPressed == false && dashState.dashCor != null);
 
@@ -158,6 +183,14 @@ SubStateMachine.RegisterCondition(PlayerMoveState.Dash, PlayerMoveState.Walk,
 
 - 대시 입력 시 `dashTime`동안 `dashSpeed` 커브에 따라 X속도 제어
 - 대시 종료 후 자동으로 Walk 복귀
+- 대시 중 입력이 없어도 Idle로 빠지지 않음 (`IsDashing` 가드)
 - 대시 중 재대시 불가 (Walk→Dash 조건에 `dashCor == null` 이미 포함)
 - 대시 중 외부에서 상태 변경 시 코루틴 정리됨 (Exit에서 StopCoroutine)
 - Unity 컴파일 에러 없음
+
+---
+
+## 구현 후 수동 작업 (사용자)
+
+- `MoveStatDataSO` 에셋에서 `DASH_SPEED` 값 설정 (예: 15.0)
+- `Player` Inspector에서 `DashConfig.dashTime`, `DashConfig.dashSpeed` 커브 설정
