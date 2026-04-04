@@ -43,15 +43,15 @@ namespace PlayerNamespace
         {
             player = caster;
             SubStateMachine.RegisterState(PlayerMoveState.Walk, new PlayerWalk(caster));
-            SubStateMachine.RegisterState(PlayerMoveState.Dash, new PlayerDash(caster));
+            SubStateMachine.RegisterState(PlayerMoveState.Dash, new PlayerDash(caster, caster.DashConfig));
             SubStateMachine.RegisterState(PlayerMoveState.Jump, new PlayerJump(caster));
 
             dashState = SubStateMachine.GetState(PlayerMoveState.Dash) as PlayerDash;
 
             SubStateMachine.RegisterCondition(PlayerMoveState.Walk, PlayerMoveState.Dash, 
                 () => player.InputHandler.DashPressed && dashState.dashCor == null);
-            SubStateMachine.RegisterCondition(PlayerMoveState.Dash, PlayerMoveState.Walk, 
-                () => player.InputHandler.DashPressed == false && dashState.dashCor != null);
+            SubStateMachine.RegisterCondition(PlayerMoveState.Dash, PlayerMoveState.Walk,
+                () => dashState.dashCor == null);
 
             SubStateMachine.RegisterCondition(PlayerMoveState.Walk, PlayerMoveState.Jump, () => player.InputHandler.JumpPressed && player.IsGrounded);
             SubStateMachine.RegisterCondition(PlayerMoveState.Jump, PlayerMoveState.Walk, () => player.IsGrounded && caster.Rb2d.linearVelocity.y <= 0f);
@@ -85,14 +85,19 @@ namespace PlayerNamespace
                 Vector2 vel = caster.Rb2d.linearVelocity;
                 vel.x = player.InputHandler.MoveInput.x * moveSpeed;
                 caster.Rb2d.linearVelocity = vel;
+
+                if (player.InputHandler.MoveInput.x != 0f)
+                    player.FacingDirection = Mathf.Sign(player.InputHandler.MoveInput.x);
             }
         }
 
         [Serializable]
         public class DashConfig
         {
-            [Tooltip("대시")] public AnimationCurve dashSpeed = AnimationCurve.Linear(0, 1, 1, 0);
+            [Tooltip("대시 속도 커브 (X=정규화 시간 0~1, Y=배율)")]
+            public AnimationCurve dashSpeed = AnimationCurve.Linear(0, 1, 1, 0);
             public float dashTime;
+            public float baseSpeed;
         }
 
         public class PlayerDash : StateBase
@@ -100,16 +105,52 @@ namespace PlayerNamespace
             public Coroutine dashCor;
             private Player player;
             private DashConfig dashConfig;
+            private float dashDir;
 
-            public PlayerDash(Player caster) : base(caster)
+            public PlayerDash(Player caster, DashConfig config) : base(caster)
             {
                 player = caster;
+                dashConfig = config;
             }
 
             public override void Enter()
             {
                 base.Enter();
-                //dashCor = player.StartCoroutine(DashCoroutine());
+                dashDir = player.InputHandler.MoveInput.x != 0f
+                    ? Mathf.Sign(player.InputHandler.MoveInput.x)
+                    : player.FacingDirection;
+
+                dashCor = player.StartCoroutine(DashCoroutine());
+            }
+
+            public override void Exit()
+            {
+                base.Exit();
+                if (dashCor != null)
+                {
+                    player.StopCoroutine(dashCor);
+                    dashCor = null;
+                }
+            }
+
+            private IEnumerator DashCoroutine()
+            {
+                float elapsed = 0f;
+
+                while (elapsed < dashConfig.dashTime)
+                {
+                    float t = elapsed / dashConfig.dashTime;
+                    float speed = dashConfig.dashSpeed.Evaluate(t) * dashConfig.baseSpeed;
+
+                    Vector2 vel = caster.Rb2d.linearVelocity;
+                    vel.x = dashDir * speed;
+                    caster.Rb2d.linearVelocity = vel;
+
+                    elapsed += Time.deltaTime;
+                    yield return null;
+                }
+
+                dashCor = null;
             }
         }
 
@@ -152,6 +193,11 @@ namespace PlayerNamespace
 
         public MoveStatDataSO MoveStatData => moveStatData;
         [SerializeField] private MoveStatDataSO moveStatData;
+
+        [SerializeField] private PlayerCompositeMove.DashConfig dashConfig;
+        public PlayerCompositeMove.DashConfig DashConfig => dashConfig;
+
+        public float FacingDirection { get; set; } = 1f;
 
         #endregion
 

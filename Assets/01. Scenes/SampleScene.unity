@@ -268,6 +268,33 @@ MonoBehaviour:
   entryStateKey: 0
   attackStatData: {fileID: 11400000, guid: c19bebc8f2e1c624aa0f45b68b384934, type: 2}
   moveStatData: {fileID: 11400000, guid: e1611f8451ea1f64da6cf513c1912b0b, type: 2}
+  dashConfig:
+    dashSpeed:
+      serializedVersion: 2
+      m_Curve:
+      - serializedVersion: 3
+        time: 0
+        value: 1
+        inSlope: 0
+        outSlope: -1
+        tangentMode: 0
+        weightedMode: 0
+        inWeight: 0
+        outWeight: 0
+      - serializedVersion: 3
+        time: 1
+        value: 0
+        inSlope: -1
+        outSlope: 0
+        tangentMode: 0
+        weightedMode: 0
+        inWeight: 0
+        outWeight: 0
+      m_PreInfinity: 2
+      m_PostInfinity: 2
+      m_RotationOrder: 4
+    dashTime: 0.1
+    baseSpeed: 100
 --- !u!61 &174610030
 BoxCollider2D:
   m_ObjectHideFlags: 0
