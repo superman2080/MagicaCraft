@@ -74,6 +74,7 @@ public class EntityStateMachine
     public void Exit()
     {
         state?.Exit();
+        state = null;
     }
 
     // HFSM용: Enter 없이 초기 상태만 지정 (생성 시점과 진입 시점 분리)

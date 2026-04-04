@@ -193,7 +193,7 @@ namespace PlayerNamespace
             stateMachine.RegisterState(PlayerState.Move, new PlayerCompositeMove(this));
 
             stateMachine.RegisterCondition(PlayerState.Idle, PlayerState.Move, () => InputHandler.MoveInput != Vector2.zero || InputHandler.JumpPressed == true);
-            stateMachine.RegisterCondition(PlayerState.Move, PlayerState.Idle, () => InputHandler.MoveInput == Vector2.zero && InputHandler.JumpPressed == false && IsGrounded);
+            stateMachine.RegisterCondition(PlayerState.Move, PlayerState.Idle, () => InputHandler.MoveInput == Vector2.zero && InputHandler.JumpPressed == false && IsGrounded && Rb2d.linearVelocity.y <= 0f);
         }
 
         public void Attack(IDamagable target, float amount)

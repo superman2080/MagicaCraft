@@ -1,115 +1,91 @@
-# PlayerJump 구현 Research
+# Research — Dash 상태 구현
 
-## 현재 PlayerJump 코드
+## 현재 PlayerDash 코드
 
 ```csharp
-public class PlayerJump : StateBase
+public class PlayerDash : StateBase
 {
+    public Coroutine dashCor;
     private Player player;
-    public bool isGrounded = true;  // 초기값 true
+    private DashConfig dashConfig;  // 생성자에서 할당 안 됨
+
+    public PlayerDash(Player caster) : base(caster)
+    {
+        player = caster;
+    }
 
     public override void Enter()
     {
-        Vector2 vel = caster.Rb2d.linearVelocity;
-        vel.y = player.MoveStat.Get(MoveStatType.JUMP_FORCE);
-        caster.Rb2d.AddForce(vel, ForceMode2D.Impulse);  // ← 버그
-    }
-
-    public override void FixedExecute()
-    {
-        // OverlapBox로 착지 판정 → isGrounded 갱신
-        isGrounded = Physics2D.OverlapBox(..., LayerMask.GetMask("Ground"));
+        base.Enter();
+        //dashCor = player.StartCoroutine(DashCoroutine()); // 미구현
     }
 }
 ```
 
----
-
-## 문제점 분석
-
-### 버그 1 — Enter(): x 속도가 임펄스에 포함됨
+## DashConfig (PlayerCompositeMove 내 중첩 클래스)
 
 ```csharp
-Vector2 vel = caster.Rb2d.linearVelocity; // x 성분 포함
-vel.y = JUMP_FORCE;
-caster.Rb2d.AddForce(vel, ForceMode2D.Impulse);
-// → 현재 수평 이동속도까지 임펄스로 추가됨 (수평 이중 적용)
+[Serializable]
+public class DashConfig
+{
+    [Tooltip("대시")] public AnimationCurve dashSpeed = AnimationCurve.Linear(0, 1, 1, 0);
+    public float dashTime;
+}
 ```
 
-**수정**: `Vector2.up * JUMP_FORCE` 만 임펄스로 적용
+- `dashSpeed` 커브: X = 시간 정규화(0~1), Y = 속도 배율(0~1 등)
+- `dashTime`: 대시 지속 시간(초)
+- `Player`에 `dashConfig` 필드 없음 → SerializeField로 추가 필요
+- `PlayerDash` 생성자에 전달 필요
 
----
+## 전환 조건 현황 (PlayerCompositeMove 생성자)
 
-### 버그 2 — Jump 상태에서 빠져나오는 전환 조건 없음
-
-`PlayerCompositeMove` 생성자의 전환 등록:
 ```csharp
 // Walk → Dash
-// Dash → Walk
-// AnyState → Jump (JumpPressed && jumpState.isGrounded)
-// Jump → ??? ← 없음
+() => player.InputHandler.DashPressed && dashState.dashCor == null
+
+// Dash → Walk  ← 버그
+() => player.InputHandler.DashPressed == false && dashState.dashCor != null
 ```
 
-착지해도 Jump 상태에서 Walk로 돌아오는 조건이 없어 Jump 상태 고착 발생.
+**버그 원인**: `DashPressed`는 LateUpdate에서 매 프레임 false로 초기화됨.
+Dash 상태 진입 다음 프레임에 `DashPressed == false && dashCor != null`이 즉시 참이 되어 Walk로 복귀.
 
-**수정**: `Jump → Walk` 조건 추가 — 착지 시 (`IsGrounded && vel.y <= 0`)
+**올바른 조건**: `dashCor == null` — 코루틴이 종료되면 Walk로 복귀.
 
----
+## MoveStatType (Stat.cs)
 
-### 설계 문제 — isGrounded가 Jump 상태 내부에만 존재
-
-`jumpState.isGrounded`는 `PlayerJump.FixedExecute()`가 호출될 때만 갱신됨.
-Walk/Dash 등 다른 상태일 때는 FixedExecute가 호출되지 않아 `isGrounded`가 **마지막 Jump 상태 종료 시 값으로 고정**.
-
-- 초기값이 `true`라 첫 점프는 가능
-- 착지 후 Walk로 돌아온 뒤 다음 점프 조건도 마지막 isGrounded 값에 의존
-- 이론적으로 동작하지만, 착지 판정이 올바르게 이루어지지 않을 수 있음
-
-**수정**: `IsGrounded`를 `Player`에 이동시켜 항상 최신 상태 유지
-
----
-
-## isGrounded 판정 방식 비교
-
-| 방식 | 장점 | 단점 |
-|---|---|---|
-| **OverlapBox** (현재) | 간단 | FixedUpdate마다 쿼리 발생, Jump 상태에서만 갱신 |
-| **OnCollision 이벤트** | 이벤트 기반(비용 없음), 항상 최신 | 복수 Ground 오브젝트 처리 필요 (카운트 방식) |
-
-→ **OnCollision 카운트 방식** 채택: `Player`에 `_groundContactCount` + `IsGrounded` 프로퍼티 추가
-
----
-
-## 관련 전환 조건 (변경 전/후)
-
-```
-// AnyState → Jump
-변경 전: () => player.InputHandler.JumpPressed && jumpState.isGrounded == true
-변경 후: () => player.InputHandler.JumpPressed && player.IsGrounded
-
-// Jump → Walk (신규)
-추가:    () => player.IsGrounded && caster.Rb2d.linearVelocity.y <= 0f
+```csharp
+public enum MoveStatType
+{
+    MOVE_SPEED,
+    JUMP_FORCE,
+    // DASH_SPEED 없음 → 추가 필요
+}
 ```
 
-`vel.y <= 0` 조건이 필요한 이유:
-점프 직후 물리 연산 타이밍에 따라 `IsGrounded`가 한 프레임 true로 남아있을 수 있음.
-하강 중 또는 정지(`vel.y <= 0`)일 때만 착지로 판정해 점프 직후 즉시 복귀 방지.
+대시 기본 속도를 스탯으로 관리해야 함.
+추가 후 `MoveStatDataSO` 에셋에서 Inspector 값 설정 필요.
 
----
+## 대시 방향 결정
 
-## 이중 점프 방지
+- `MoveInput.x != 0`이면 해당 방향 사용
+- 입력 없으면 마지막으로 이동한 방향(facing direction) 사용
+- `Player`에 `float facingDirection` (1f or -1f) 유지 필요
 
-OnCollision 방식에서 점프 Enter 직후 `OnCollisionExit2D`가 발생 → `_groundContactCount = 0` → `IsGrounded = false`.
-AnyState → Jump 조건 `JumpPressed && player.IsGrounded`가 자연스럽게 이중 점프 차단.
+## 대시 중 물리 처리
 
----
+- Dash 상태에서는 `PlayerWalk.FixedExecute()`가 실행되지 않음
+- `PlayerDash.FixedExecute()`에서 X 속도를 커브 × 기본속도 × 방향으로 직접 제어
+- Y 속도는 건드리지 않음 (중력 유지)
+- 대시 도중 점프 전환 방지: Walk→Jump 조건만 있어 Dash 중엔 Jump 불가 (현재 구조상 OK)
 
-## 영향 파일
+## 영향 범위
 
-| 파일 | 변경 |
+| 파일 | 변경 내용 |
 |---|---|
-| `Player.cs` | `IsGrounded` 프로퍼티, `OnCollisionEnter/Exit2D` 추가 |
-| `Player.cs` | `PlayerJump.Enter()` 버그 수정 |
-| `Player.cs` | `PlayerJump.FixedExecute()` 제거 (OverlapBox 불필요) |
-| `Player.cs` | `PlayerJump.isGrounded` 필드 제거 |
-| `Player.cs` | AnyState→Jump 전환 조건 수정, Jump→Walk 전환 추가 |
+| `Stat.cs` | `MoveStatType`에 `DASH_SPEED` 추가 |
+| `Player.cs` | `dashConfig` SerializeField 추가, `facingDirection` 추가 |
+| `Player.cs` | `PlayerDash` 구현 (코루틴, Enter/Exit) |
+| `Player.cs` | Dash→Walk 전환 조건 수정 |
+| `MoveStatDataSO` 에셋 | Inspector에서 `DASH_SPEED` 값 설정 (코드 외 작업) |
