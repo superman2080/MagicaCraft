@@ -9,8 +9,21 @@ public class WeaponController
     public IWeapon Weapon => weapon;
     private IWeapon weapon;
 
-    public void InitializeWeapon(IWeapon weapon)
+    public void EquipWeapon(IWeapon weapon)
     {
-        
+        this.weapon?.DivestWeapon(this);
+
+        this.weapon = weapon;
+        weapon.EquipWeapon(this);
+    }
+
+    public void DivestWeapon()
+    {
+        weapon?.DivestWeapon(this);
+    }
+
+    public void UseWeapon()
+    {
+        weapon?.Using(owner);
     }
 }

@@ -2,7 +2,8 @@ using UnityEngine;
 
 public interface IWeapon
 {
-    void InitialWeapon(WeaponController controller);
+    void EquipWeapon(WeaponController controller);
+    void DivestWeapon(WeaponController controller);
 
     void Using(IAttackable attackable);
 }

@@ -37,7 +37,6 @@ namespace PlayerNamespace
     {
         private Player player;
         private PlayerDash dashState;
-        private PlayerJump jumpState;
 
         public PlayerCompositeMove(Player caster) : base(caster)
         {
@@ -60,7 +59,10 @@ namespace PlayerNamespace
         public override void Enter()
         {
             base.Enter();
-            SubStateMachine.ChangeState(PlayerMoveState.Walk);
+            if (player.InputHandler.JumpPressed && player.IsGrounded)
+                SubStateMachine.ChangeState(PlayerMoveState.Jump);
+            else
+                SubStateMachine.ChangeState(PlayerMoveState.Walk);
         }
 
         public override void Execute()
@@ -135,9 +137,8 @@ namespace PlayerNamespace
 
             private IEnumerator DashCoroutine()
             {
-                float elapsed = 0f;
 
-                while (elapsed < dashConfig.dashTime)
+                for (float elapsed = 0; elapsed < dashConfig.dashTime; elapsed += Time.fixedDeltaTime)
                 {
                     float t = elapsed / dashConfig.dashTime;
                     float speed = dashConfig.dashSpeed.Evaluate(t) * dashConfig.baseSpeed;
@@ -146,7 +147,6 @@ namespace PlayerNamespace
                     vel.x = dashDir * speed;
                     caster.Rb2d.linearVelocity = vel;
 
-                    elapsed += Time.deltaTime;
                     yield return null;
                 }
 
