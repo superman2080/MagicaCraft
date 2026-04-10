@@ -6,7 +6,7 @@ public delegate void OnToggleSkillInactivated(ToggleSkillBase skill);
 
 public class ToggleSkillBase : ActiveSkillBase
 {
-    #region ConfigDatas
+    #region Config Datas
     public override ActiveSkillType Type => ActiveSkillType.Toggle;
     public bool IsActive => isActive;
     private bool isActive;
@@ -19,7 +19,7 @@ public class ToggleSkillBase : ActiveSkillBase
     #endregion
 
 
-    private Coroutine SkillCor;
+    private Coroutine skillCor;
 
     public ToggleSkillBase(Entity caster, float tick = 0.25f) : base(caster)
     {
@@ -32,12 +32,12 @@ public class ToggleSkillBase : ActiveSkillBase
         if(isActive == false)
         {
             OnActivated?.Invoke(this);
-            caster.StartCoroutine(SkillCoroutine());
+            skillCor = caster.StartCoroutine(SkillCoroutine());
         }
         else
         {
             OnInactivated?.Invoke(this);
-            caster.StopCoroutine(SkillCoroutine());
+            caster.StopCoroutine(skillCor);
         }
 
         isActive = !isActive;
@@ -45,6 +45,14 @@ public class ToggleSkillBase : ActiveSkillBase
 
     private IEnumerator SkillCoroutine()
     {
-        yield break;
+        WaitForSeconds wait = new WaitForSeconds(Tick);
+        while (true)
+        {
+            if (caster.gameObject.activeSelf == false)
+                yield break;
+
+            Execute();
+            yield return wait;
+        }
     }
 }

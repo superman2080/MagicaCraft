@@ -9,8 +9,7 @@ using UnityEngine;
 //   2. Update()   → item.OnUpdate 실행 (매 프레임)
 //   3. 충돌       → item.OnEnd 실행 (proj + victim 주입). item 없으면 기본 데미지
 //   4. 수명 초과  → 자동 반환
-[RequireComponent(typeof(Rigidbody2D))]
-[RequireComponent(typeof(CircleCollider2D))]
+[RequireComponent(typeof(Rigidbody2D)), RequireComponent(typeof(CircleCollider2D))]
 public class SpellProjectile : Poolable
 {
     [Tooltip("투사체 수명 (초). 이 시간이 지나면 자동 반환된다.")]
@@ -33,6 +32,7 @@ public class SpellProjectile : Poolable
     private LayerMask           _attackLayer;
     private float               _spawnTime;
     private bool                _isAlive;
+    private System.Action       _returnCallback;
 
     // ─── Unity 생명주기 ───────────────────────────────────────
 
@@ -98,19 +98,21 @@ public class SpellProjectile : Poolable
         Vector2          startPos,
         Vector2          direction,
         float            speed,
+        System.Action    returnCallback,
         ProjectileObject projObj = null,
         ElementType      element = ElementType.None,
         float            damage  = 0f)
     {
-        _ctx       = ctx;
-        _mana      = mana;
-        _projObj   = projObj;
-        Speed      = speed;
-        Element    = element;
-        Damage     = damage;
-        _data      = new SpellProjectileData(this);
-        _spawnTime = Time.time;
-        _isAlive   = true;
+        _ctx            = ctx;
+        _mana           = mana;
+        _projObj        = projObj;
+        Speed           = speed;
+        Element         = element;
+        Damage          = damage;
+        _returnCallback = returnCallback;
+        _data           = new SpellProjectileData(this);
+        _spawnTime      = Time.time;
+        _isAlive        = true;
 
         Rb2d.position       = startPos;
         Rb2d.linearVelocity = direction.normalized * speed;
@@ -135,9 +137,10 @@ public class SpellProjectile : Poolable
             _mana.OnDepleted -= ReturnToPool;
             _mana = null;
         }
-        _ctx                = null;
-        _projObj            = null;
-        _data               = null;
+        _ctx            = null;
+        _projObj        = null;
+        _data           = null;
+        _returnCallback = null;
         Rb2d.linearVelocity = Vector2.zero;
         base.OnDespawn();
     }
@@ -147,7 +150,7 @@ public class SpellProjectile : Poolable
     private void ReturnToPool()
     {
         _isAlive = false;
-        SpellProjectilePool.Instance.Return(this);
+        _returnCallback?.Invoke();
     }
 
     private void RunLifecycle(System.Action runner)

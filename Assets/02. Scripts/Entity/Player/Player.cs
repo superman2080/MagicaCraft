@@ -9,6 +9,7 @@ namespace PlayerNamespace
     {
         Idle,
         Move,
+        Death,
     }
 
     public enum PlayerMoveState
@@ -20,8 +21,16 @@ namespace PlayerNamespace
 
     public class PlayerIdle : StateBase
     {
+        private Player player;
         public PlayerIdle(Player caster) : base(caster)
         {
+            player = caster;
+        }
+
+        public override void Enter()
+        {
+            base.Enter();
+            player.Animator?.SetBool("1_Move", false);
         }
 
         public override void FixedExecute()
@@ -37,21 +46,20 @@ namespace PlayerNamespace
     {
         private Player player;
         private PlayerDash dashState;
-        private PlayerJump jumpState;
 
         public PlayerCompositeMove(Player caster) : base(caster)
         {
             player = caster;
             SubStateMachine.RegisterState(PlayerMoveState.Walk, new PlayerWalk(caster));
-            SubStateMachine.RegisterState(PlayerMoveState.Dash, new PlayerDash(caster));
+            SubStateMachine.RegisterState(PlayerMoveState.Dash, new PlayerDash(caster, caster.DashConfig));
             SubStateMachine.RegisterState(PlayerMoveState.Jump, new PlayerJump(caster));
 
             dashState = SubStateMachine.GetState(PlayerMoveState.Dash) as PlayerDash;
 
             SubStateMachine.RegisterCondition(PlayerMoveState.Walk, PlayerMoveState.Dash, 
                 () => player.InputHandler.DashPressed && dashState.dashCor == null);
-            SubStateMachine.RegisterCondition(PlayerMoveState.Dash, PlayerMoveState.Walk, 
-                () => player.InputHandler.DashPressed == false && dashState.dashCor != null);
+            SubStateMachine.RegisterCondition(PlayerMoveState.Dash, PlayerMoveState.Walk,
+                () => dashState.dashCor == null);
 
             SubStateMachine.RegisterCondition(PlayerMoveState.Walk, PlayerMoveState.Jump, () => player.InputHandler.JumpPressed && player.IsGrounded);
             SubStateMachine.RegisterCondition(PlayerMoveState.Jump, PlayerMoveState.Walk, () => player.IsGrounded && caster.Rb2d.linearVelocity.y <= 0f);
@@ -60,7 +68,10 @@ namespace PlayerNamespace
         public override void Enter()
         {
             base.Enter();
-            SubStateMachine.ChangeState(PlayerMoveState.Walk);
+            if (player.InputHandler.JumpPressed && player.IsGrounded)
+                SubStateMachine.ChangeState(PlayerMoveState.Jump);
+            else
+                SubStateMachine.ChangeState(PlayerMoveState.Walk);
         }
 
         public override void Execute()
@@ -77,6 +88,12 @@ namespace PlayerNamespace
                 player = caster;
             }
 
+            public override void Enter()
+            {
+                base.Enter();
+                player.Animator?.SetBool("1_Move", true);
+            }
+
             public override void FixedExecute()
             {
                 base.FixedExecute();
@@ -85,14 +102,27 @@ namespace PlayerNamespace
                 Vector2 vel = caster.Rb2d.linearVelocity;
                 vel.x = player.InputHandler.MoveInput.x * moveSpeed;
                 caster.Rb2d.linearVelocity = vel;
+
+                if (player.InputHandler.MoveInput.x != 0f)
+                {
+                    player.FacingDirection = Mathf.Sign(player.InputHandler.MoveInput.x);
+                    if (player.Animator != null)
+                    {
+                        var scale = player.Animator.transform.localScale;
+                        scale.x = Mathf.Abs(scale.x) * -player.FacingDirection;
+                        player.Animator.transform.localScale = scale;
+                    }
+                }
             }
         }
 
         [Serializable]
         public class DashConfig
         {
-            [Tooltip("대시")] public AnimationCurve dashSpeed = AnimationCurve.Linear(0, 1, 1, 0);
+            [Tooltip("대시 속도 커브 (X=정규화 시간 0~1, Y=배율)")]
+            public AnimationCurve dashSpeed = AnimationCurve.Linear(0, 1, 1, 0);
             public float dashTime;
+            public float baseSpeed;
         }
 
         public class PlayerDash : StateBase
@@ -100,16 +130,50 @@ namespace PlayerNamespace
             public Coroutine dashCor;
             private Player player;
             private DashConfig dashConfig;
+            private float dashDir;
 
-            public PlayerDash(Player caster) : base(caster)
+            public PlayerDash(Player caster, DashConfig config) : base(caster)
             {
                 player = caster;
+                dashConfig = config;
             }
 
             public override void Enter()
             {
                 base.Enter();
-                //dashCor = player.StartCoroutine(DashCoroutine());
+                dashDir = player.InputHandler.MoveInput.x != 0f
+                    ? Mathf.Sign(player.InputHandler.MoveInput.x)
+                    : player.FacingDirection;
+
+                dashCor = player.StartCoroutine(DashCoroutine());
+            }
+
+            public override void Exit()
+            {
+                base.Exit();
+                if (dashCor != null)
+                {
+                    player.StopCoroutine(dashCor);
+                    dashCor = null;
+                }
+            }
+
+            private IEnumerator DashCoroutine()
+            {
+
+                for (float elapsed = 0; elapsed < dashConfig.dashTime; elapsed += Time.fixedDeltaTime)
+                {
+                    float t = elapsed / dashConfig.dashTime;
+                    float speed = dashConfig.dashSpeed.Evaluate(t) * dashConfig.baseSpeed;
+
+                    Vector2 vel = caster.Rb2d.linearVelocity;
+                    vel.x = dashDir * speed;
+                    caster.Rb2d.linearVelocity = vel;
+
+                    yield return null;
+                }
+
+                dashCor = null;
             }
         }
 
@@ -130,10 +194,27 @@ namespace PlayerNamespace
         }
     }
 
-    [RequireComponent(typeof(PlayerInputHandler)), RequireComponent(typeof(Animator))]
+    public class PlayerDeath : StateBase
+    {
+        private Player player;
+        public PlayerDeath(Player caster) : base(caster)
+        {
+            player = caster;
+        }
+
+        public override void Enter()
+        {
+            base.Enter();
+            player.Animator?.SetTrigger("4_Death");
+            player.Animator?.SetBool("isDeath", true);
+        }
+    }
+
+    [RequireComponent(typeof(PlayerInputHandler))]
     public class Player : Entity, IAttackable, IMovable
     {
-        [HideInInspector] public Animator animator;
+        public Animator Animator { get; private set; }
+
         public override Enum EntryStateKey => entryStateKey;
         [SerializeField] private PlayerState entryStateKey;
 
@@ -152,6 +233,11 @@ namespace PlayerNamespace
 
         public MoveStatDataSO MoveStatData => moveStatData;
         [SerializeField] private MoveStatDataSO moveStatData;
+
+        [SerializeField] private PlayerCompositeMove.DashConfig dashConfig;
+        public PlayerCompositeMove.DashConfig DashConfig => dashConfig;
+
+        public float FacingDirection { get; set; } = 1f;
 
         #endregion
 
@@ -175,7 +261,14 @@ namespace PlayerNamespace
         protected override void Start()
         {
             InputHandler = GetComponent<PlayerInputHandler>();
-            animator = gameObject.GetComponent<Animator>();
+            foreach (var anim in GetComponentsInChildren<Animator>())
+            {
+                if (anim.runtimeAnimatorController != null)
+                {
+                    Animator = anim;
+                    break;
+                }
+            }
             base.Start();
             moveStat = new MoveStat(moveStatData);
         }
@@ -191,9 +284,18 @@ namespace PlayerNamespace
             base.InitializeStateMachine();
             stateMachine.RegisterState(PlayerState.Idle, new PlayerIdle(this));
             stateMachine.RegisterState(PlayerState.Move, new PlayerCompositeMove(this));
+            stateMachine.RegisterState(PlayerState.Death, new PlayerDeath(this));
 
             stateMachine.RegisterCondition(PlayerState.Idle, PlayerState.Move, () => InputHandler.MoveInput != Vector2.zero || InputHandler.JumpPressed == true);
             stateMachine.RegisterCondition(PlayerState.Move, PlayerState.Idle, () => InputHandler.MoveInput == Vector2.zero && InputHandler.JumpPressed == false && IsGrounded && Rb2d.linearVelocity.y <= 0f);
+            stateMachine.RegisterAnyStateTransition(PlayerState.Death, () => HP <= 0f);
+        }
+
+        public override void TakeDamage(IAttackable caster, float amount, ElementType element = ElementType.None)
+        {
+            base.TakeDamage(caster, amount, element);
+            if (HP > 0f)
+                Animator?.SetTrigger("3_Damaged");
         }
 
         public void Attack(IDamagable target, float amount)

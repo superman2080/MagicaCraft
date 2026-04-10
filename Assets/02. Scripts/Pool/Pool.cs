@@ -1,78 +1,72 @@
+using System;
 using System.Collections.Generic;
+using AYellowpaper.SerializedCollections;
 using UnityEngine;
 
-public abstract class Pool<T> : MonoBehaviour where T : Poolable
+public enum PoolKey
 {
-    public int initialSize = 10;
-    public T prefab;
+    SpellProjectile,
+}
 
-    private static Pool<T> instance;
-    public static Pool<T> Instance
+
+public class Pool : Singleton<Pool>
+{
+    [SerializeField] private SerializedDictionary<PoolKey, Poolable> prefabs = new();
+    [SerializeField] private int initialSize = 5;
+
+    private readonly Dictionary<PoolKey, Queue<IPoolable>> _pools = new();
+
+    private void Start()
     {
-        get
+        foreach (var kvp in prefabs)
         {
-            if (instance == null)
+            var queue = new Queue<IPoolable>();
+            for (int i = 0; i < initialSize; i++)
             {
-                instance = (Pool<T>)FindAnyObjectByType(typeof(Pool<T>));
-
-                if (instance == null)
-                {
-                    Debug.LogError($"[Pool] {typeof(T).Name} Pool이 씬에 없습니다. Pool 오브젝트를 씬에 추가하세요.");
-                }
+                var obj = CreateNew(kvp.Key);
+                obj.OnDespawn();
+                queue.Enqueue(obj);
             }
-            return instance;
+            _pools[kvp.Key] = queue;
         }
     }
 
-    private Queue<T> pool = new();
-
-    protected virtual void Start()
+    private IPoolable CreateNew(PoolKey key)
     {
-        for (int i = 0; i < initialSize; i++)
-        {
-            var obj = CreateNew();
-            obj.gameObject.SetActive(false);
-            pool.Enqueue(obj);
-        }
+        if (!prefabs.TryGetValue(key, out var prefab) || prefab == null)
+            throw new InvalidOperationException(
+                $"[Pool] 키 '{key}'에 대한 프리팹이 등록되지 않았습니다.");
+        return Instantiate(prefab);
     }
 
-    protected virtual T CreateNew() => Instantiate(prefab, transform);
-
-    public virtual T Get()
+    private IPoolable GetInternal(PoolKey key)
     {
-        var obj = pool.Count > 0 ? pool.Dequeue() : CreateNew();
+        if (!_pools.TryGetValue(key, out var queue))
+            _pools[key] = queue = new Queue<IPoolable>();
+        return queue.Count > 0 ? queue.Dequeue() : CreateNew(key);
+    }
+
+    public IPoolable Get(PoolKey key)
+    {
+        var obj = GetInternal(key);
         obj.OnSpawn();
         return obj;
     }
 
-    public virtual T Get(Vector3 position)
+    // 데이터 주입 오버로드 — initializer 실행 후 OnSpawn() 호출
+    public T Get<T>(PoolKey key, Action<T> initializer) where T : class, IPoolable
     {
-        var obj = Get();
-        obj.transform.position = position;
+        var obj = GetInternal(key) as T;
+        initializer?.Invoke(obj);
+        obj.OnSpawn();
         return obj;
     }
 
-    public virtual T Get(Vector3 position, Quaternion rotation)
+    public void Return(PoolKey key, IPoolable obj)
     {
-        var obj = Get(position);
-        obj.transform.rotation = rotation;
-        return obj;
-    }
-
-    public virtual T Get(Vector3 position, Quaternion rotation, Vector3 scale)
-    {
-        var obj = Get(position, rotation);
-        obj.transform.localScale = scale;
-        return obj;
-    }
-
-    public virtual void Return(T obj)
-    {
-        obj.transform.position = Vector3.zero;
-        obj.transform.rotation = Quaternion.identity;
-        obj.transform.localScale = Vector3.one;
-
         obj.OnDespawn();
-        pool.Enqueue(obj);
+        if (!_pools.TryGetValue(key, out var queue))
+            _pools[key] = queue = new Queue<IPoolable>();
+        queue.Enqueue(obj);
     }
 }

@@ -198,14 +198,42 @@ public abstract class Stat<T> where T : Enum
         defaultStat[type] = defaultVal;
         Update();
     }
+
+    public virtual void SetDefault(StatData<T> otherStat)
+    {
+        foreach (var type in defaultStat.Keys)
+        {
+            defaultStat[type] = otherStat.StatDict[type];
+        }
+        Update();
+    }
+
     public virtual void Add(T type, float addition)
     {
         addValue[type] += addition;
     }
+
+    public virtual void Add(StatData<T> otherStat)
+    {
+        foreach (var type in defaultStat.Keys)
+        {
+            addValue[type] += otherStat.StatDict[type];
+        }
+    }
+
     public virtual void Multiply(T type, float multiplier)
     {
         multipleValue[type] *= multiplier;
     }
+
+    public virtual void Multiply(StatData<T> otherStat)
+    {
+        foreach (var type in defaultStat.Keys)
+        {
+            addValue[type] *= otherStat.StatDict[type];
+        }
+    }
+
     public float Get(T type)
     {
         return currentValue[type];

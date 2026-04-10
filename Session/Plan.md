@@ -1,196 +1,205 @@
-# Plan — Dash 상태 구현
+# Plan — 오브젝트 풀 팩토리 메서드 패턴 리팩터링
 
 ## 개요
 
-`PlayerDash` 상태를 완전히 구현한다.
-코루틴 기반으로 `DashConfig.dashSpeed` 커브와 `DASH_SPEED` 스탯을 조합해 대시 속도를 제어하고,
-대시 종료 시 자동으로 Walk로 복귀한다.
+단일 `Pool : Singleton<Pool>`이 `SerializedDictionary<Enum, Poolable>`로
+모든 IPoolable 객체를 한 곳에서 관리한다.
+데이터 주입은 `Get<T>(key, Action<T> initializer)` 오버로드로 처리한다:
+caller가 람다로 초기화 코드를 전달하면 Pool이 `OnSpawn()` 전에 실행한다.
+서브클래스·오버라이드 없이 Inspector 프리팹 주입만으로 새 타입 추가 가능.
 
 ---
 
 ## 단계별 구현 계획
 
-### [대기] 단계 1 — `MoveStatType`에 `DASH_SPEED` 추가
+### [완료] 단계 1 — `IPoolable` 인터페이스 신설
 
-**파일**: `Assets/02. Scripts/Entity/Stat/Stat.cs`
+**파일**: `Assets/02. Scripts/Pool/IPoolable.cs` (신규)
 
 ```csharp
-public enum MoveStatType
+public interface IPoolable
 {
-    MOVE_SPEED,
-    JUMP_FORCE,
-    DASH_SPEED,  // 추가
+    void OnSpawn();
+    void OnDespawn();
 }
 ```
 
-**주의**: `MoveStatDataSO` 에셋에서 Inspector로 `DASH_SPEED` 값 설정 필요 (코드 외 작업).
-`Stat<T>` 생성자의 `InitStatData`는 StatData에 없는 키를 건너뛰기 때문에,
-에셋에 값이 없으면 `Get(DASH_SPEED)` 시 KeyNotFoundException 발생.
-→ 에셋 설정은 구현 완료 후 사용자가 직접 수행.
-
 ---
 
-### [대기] 단계 2 — `Player`에 `dashConfig`, `FacingDirection`, `IsDashing` 추가
+### [완료] 단계 2 — `Poolable` → `IPoolable` 구현으로 변환
 
-**파일**: `Assets/02. Scripts/Entity/Player/Player.cs`
-
-`Player` 클래스 필드 영역에 추가:
+**파일**: `Assets/02. Scripts/Pool/Poolable.cs`
 
 ```csharp
-[SerializeField] private PlayerCompositeMove.DashConfig dashConfig;
-public PlayerCompositeMove.DashConfig DashConfig => dashConfig;
-
-public float FacingDirection { get; set; } = 1f;
-public bool IsDashing { get; set; } = false;
-```
-
-`PlayerWalk.FixedExecute()`에서 방향 업데이트 추가:
-
-```csharp
-public override void FixedExecute()
+public abstract class Poolable : MonoBehaviour, IPoolable
 {
-    base.FixedExecute();
-    float moveSpeed = player.MoveStat.Get(MoveStatType.MOVE_SPEED);
-
-    Vector2 vel = caster.Rb2d.linearVelocity;
-    vel.x = player.InputHandler.MoveInput.x * moveSpeed;
-    caster.Rb2d.linearVelocity = vel;
-
-    // 이동 중이면 facing 방향 갱신
-    if (player.InputHandler.MoveInput.x != 0f)
-        player.FacingDirection = Mathf.Sign(player.InputHandler.MoveInput.x);
+    public virtual void OnSpawn()   { gameObject.SetActive(true); }
+    public virtual void OnDespawn() { gameObject.SetActive(false); }
 }
 ```
 
-> `FacingDirection`과 `IsDashing`은 같은 네임스페이스 내 중첩 클래스(PlayerWalk, PlayerDash)가 접근해야 하므로 public 프로퍼티로 선언.
-
 ---
 
-### [대기] 단계 3 — Move→Idle 전환 조건에 `!IsDashing` 추가
+### [완료] 단계 3 — `Pool : Singleton<Pool>` 재작성
 
-**파일**: `Assets/02. Scripts/Entity/Player/Player.cs`
-**위치**: `Player.InitializeStateMachine()`
+**파일**: `Assets/02. Scripts/Pool/Pool.cs`
 
-대시 중 `MoveInput == Vector2.zero` 상태(입력 없이 대시 중)가 되면
-현재 조건이 즉시 참이 되어 Idle로 전환되어 코루틴이 중단되는 버그 방지.
-
-```csharp
-// 변경 전
-stateMachine.RegisterCondition(PlayerState.Move, PlayerState.Idle,
-    () => InputHandler.MoveInput == Vector2.zero && InputHandler.JumpPressed == false && IsGrounded && Rb2d.linearVelocity.y <= 0f);
-
-// 변경 후
-stateMachine.RegisterCondition(PlayerState.Move, PlayerState.Idle,
-    () => InputHandler.MoveInput == Vector2.zero && InputHandler.JumpPressed == false && IsGrounded && Rb2d.linearVelocity.y <= 0f && !IsDashing);
-```
-
----
-
-### [대기] 단계 4 — `PlayerDash` 전체 구현
-
-**파일**: `Assets/02. Scripts/Entity/Player/Player.cs`
-
-`PlayerCompositeMove` 생성자에서 `DashConfig` 전달:
+- `Singleton<Pool>` 상속으로 싱글톤 구현 (Awake 수동 작성 불필요)
+- `SerializedDictionary<Enum, Poolable>` — Inspector에서 키·프리팹 주입
+- `Get(Enum key)` — 기본 꺼내기
+- `Get<T>(Enum key, Action<T> initializer)` — 초기 데이터 주입 오버로드
+  - `initializer` 실행 → `OnSpawn()` 순서 보장 (활성화 전 데이터 설정)
+- `Return(Enum key, IPoolable obj)` — 반환
+- `CreateNew(Enum key)` — private, prefabs 딕셔너리에서 Instantiate
 
 ```csharp
-SubStateMachine.RegisterState(PlayerMoveState.Dash, new PlayerDash(caster, caster.DashConfig));
-dashState = SubStateMachine.GetState(PlayerMoveState.Dash) as PlayerDash;
-```
+using System;
+using System.Collections.Generic;
+using AYellowpaper.SerializedCollections;
+using UnityEngine;
 
-`PlayerDash` 클래스 전체 교체:
-
-```csharp
-public class PlayerDash : StateBase
+public class Pool : Singleton<Pool>
 {
-    public Coroutine dashCor;
-    private Player player;
-    private DashConfig dashConfig;
-    private float dashDir;
+    [SerializeField] private SerializedDictionary<Enum, Poolable> prefabs = new();
+    [SerializeField] private int initialSize = 5;
 
-    public PlayerDash(Player caster, DashConfig config) : base(caster)
+    private readonly Dictionary<Enum, Queue<IPoolable>> _pools = new();
+
+    private void Start()
     {
-        player = caster;
-        dashConfig = config;
-    }
-
-    public override void Enter()
-    {
-        base.Enter();
-        // 입력 방향 우선, 없으면 마지막 facing 방향
-        dashDir = player.InputHandler.MoveInput.x != 0f
-            ? Mathf.Sign(player.InputHandler.MoveInput.x)
-            : player.FacingDirection;
-
-        player.IsDashing = true;
-        dashCor = player.StartCoroutine(DashCoroutine());
-    }
-
-    public override void Exit()
-    {
-        base.Exit();
-        player.IsDashing = false;
-        if (dashCor != null)
+        foreach (var kvp in prefabs)
         {
-            player.StopCoroutine(dashCor);
-            dashCor = null;
+            var queue = new Queue<IPoolable>();
+            for (int i = 0; i < initialSize; i++)
+            {
+                var obj = CreateNew(kvp.Key);
+                obj.OnDespawn();
+                queue.Enqueue(obj);
+            }
+            _pools[kvp.Key] = queue;
         }
     }
 
-    private IEnumerator DashCoroutine()
+    private IPoolable CreateNew(Enum key)
     {
-        float elapsed = 0f;
-        float dashSpeed = player.MoveStat.Get(MoveStatType.DASH_SPEED);
+        if (!prefabs.TryGetValue(key, out var prefab) || prefab == null)
+            throw new InvalidOperationException(
+                $"[Pool] 키 '{key}'에 대한 프리팹이 등록되지 않았습니다.");
+        return Instantiate(prefab);
+    }
 
-        while (elapsed < dashConfig.dashTime)
-        {
-            float t = elapsed / dashConfig.dashTime;
-            float speed = dashConfig.dashSpeed.Evaluate(t) * dashSpeed;
+    private IPoolable GetInternal(Enum key)
+    {
+        if (!_pools.TryGetValue(key, out var queue))
+            _pools[key] = queue = new Queue<IPoolable>();
+        return queue.Count > 0 ? queue.Dequeue() : CreateNew(key);
+    }
 
-            Vector2 vel = caster.Rb2d.linearVelocity;
-            vel.x = dashDir * speed;
-            caster.Rb2d.linearVelocity = vel;
+    public IPoolable Get(Enum key)
+    {
+        var obj = GetInternal(key);
+        obj.OnSpawn();
+        return obj;
+    }
 
-            elapsed += Time.deltaTime;
-            yield return null;
-        }
+    // 데이터 주입 오버로드 — initializer 실행 후 OnSpawn() 호출
+    public T Get<T>(Enum key, Action<T> initializer) where T : class, IPoolable
+    {
+        var obj = GetInternal(key) as T;
+        initializer?.Invoke(obj);
+        obj.OnSpawn();
+        return obj;
+    }
 
-        dashCor = null;  // 종료 → Dash→Walk 조건 충족
-        player.IsDashing = false;
+    public void Return(Enum key, IPoolable obj)
+    {
+        obj.OnDespawn();
+        if (!_pools.TryGetValue(key, out var queue))
+            _pools[key] = queue = new Queue<IPoolable>();
+        queue.Enqueue(obj);
     }
 }
 ```
 
 ---
 
-### [대기] 단계 5 — Dash→Walk 전환 조건 수정
+### [완료] 단계 4 — `SpellProjectilePool` 제거 및 `PoolKey` enum 신설
 
-**파일**: `Assets/02. Scripts/Entity/Player/Player.cs`
-**위치**: `PlayerCompositeMove` 생성자
+**파일**: `Assets/02. Scripts/Projectile/SpellProjectilePool.cs` → **삭제**  
+**파일**: `Assets/02. Scripts/Pool/PoolKey.cs` (신규)
 
 ```csharp
-// 변경 전 (버그: DashPressed는 다음 프레임에 이미 false)
-SubStateMachine.RegisterCondition(PlayerMoveState.Dash, PlayerMoveState.Walk,
-    () => player.InputHandler.DashPressed == false && dashState.dashCor != null);
+public enum PoolKey
+{
+    SpellProjectile,
+}
+```
 
-// 변경 후
-SubStateMachine.RegisterCondition(PlayerMoveState.Dash, PlayerMoveState.Walk,
-    () => dashState.dashCor == null);
+Inspector에서 `Pool` 컴포넌트의 `prefabs`에 `PoolKey.SpellProjectile` → SpellProjectile 프리팹 할당.
+
+---
+
+### [완료] 단계 5 — `SpellProjectile.Init()` 콜백 주입으로 결합 제거
+
+**파일**: `Assets/02. Scripts/Projectile/SpellProjectile.cs`
+
+`SpellProjectilePool.Instance` 직접 참조를 제거한다.
+`Init()` 호출 시 반환 콜백을 주입받아 `ReturnToPool()`에서 사용한다.
+
+```csharp
+private System.Action _returnCallback;
+
+public void Init(
+    SpellContext     ctx,
+    ManaTracker      mana,
+    Vector2          startPos,
+    Vector2          direction,
+    float            speed,
+    System.Action    returnCallback,
+    ProjectileObject projObj = null,
+    ElementType      element = ElementType.None,
+    float            damage  = 0f)
+{
+    // ... 기존 초기화 코드 유지 ...
+    _returnCallback = returnCallback;
+}
+
+private void ReturnToPool()
+{
+    _isAlive = false;
+    _returnCallback?.Invoke();
+}
+
+public override void OnDespawn()
+{
+    _returnCallback = null;
+    // ... 기존 OnDespawn 코드 유지 ...
+}
+```
+
+---
+
+### [완료] 단계 6 — `FireAction` 수정
+
+**파일**: `Assets/02. Scripts/SpellLanguage/Items/Actions/FireAction.cs`
+
+`Get<T>(key, initializer)` 오버로드로 꺼내기와 데이터 주입을 한 번에 처리한다.
+
+```csharp
+var proj = Pool.Instance.Get<SpellProjectile>(PoolKey.SpellProjectile, p =>
+    p.Init(ctx, ctx.Mana, startPos, direction, speed,
+           returnCallback: () => Pool.Instance.Return(PoolKey.SpellProjectile, p),
+           projObj: projObj));
 ```
 
 ---
 
 ## 완료 기준
 
-- 대시 입력 시 `dashTime`동안 `dashSpeed` 커브에 따라 X속도 제어
-- 대시 종료 후 자동으로 Walk 복귀
-- 대시 중 입력이 없어도 Idle로 빠지지 않음 (`IsDashing` 가드)
-- 대시 중 재대시 불가 (Walk→Dash 조건에 `dashCor == null` 이미 포함)
-- 대시 중 외부에서 상태 변경 시 코루틴 정리됨 (Exit에서 StopCoroutine)
-- Unity 컴파일 에러 없음
-
----
-
-## 구현 후 수동 작업 (사용자)
-
-- `MoveStatDataSO` 에셋에서 `DASH_SPEED` 값 설정 (예: 15.0)
-- `Player` Inspector에서 `DashConfig.dashTime`, `DashConfig.dashSpeed` 커브 설정
+- `IPoolable` 인터페이스로 풀링 계약 분리
+- `Pool : Singleton<Pool>` 단일 싱글톤으로 모든 타입 관리
+- `Get<T>(key, initializer)` 오버로드로 타입 안전한 데이터 주입
+- 서브클래스·오버라이드 없이 Inspector 프리팹 주입만으로 새 타입 추가
+- `SpellProjectile.cs`에 `SpellProjectilePool` 참조 없음
+- `SpellProjectilePool.cs` 삭제
+- Unity 컴파일 에러 없음, 투사체 발사 동작 정상

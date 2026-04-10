@@ -32,12 +32,15 @@ public class FireAction : SpellAction
         var   direction = RequireVector2(args[2], sig);
         float speed     = (float)RequireDouble(args[3], sig);
 
-        if (SpellProjectilePool.Instance == null)
+        if (Pool.Instance == null)
             throw new RuntimeException(
-                "SpellProjectilePool이 씬에 없습니다. Pool 오브젝트를 씬에 추가하세요.", line, col);
+                "Pool이 씬에 없습니다. Pool 오브젝트를 씬에 추가하세요.", line, col);
 
-        var proj = SpellProjectilePool.Instance.Get();
-        proj.Init(ctx, ctx.Mana, startPos, direction, speed, projObj);
+        var pool = Pool.Instance;
+        pool.Get<SpellProjectile>(PoolKey.SpellProjectile, p =>
+            p.Init(ctx, ctx.Mana, startPos, direction, speed,
+                   returnCallback: () => pool.Return(PoolKey.SpellProjectile, p),
+                   projObj: projObj));
         return null;
     }
 }

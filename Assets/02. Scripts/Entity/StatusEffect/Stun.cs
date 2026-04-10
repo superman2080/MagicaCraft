@@ -4,17 +4,47 @@ public class Stun : StatusEffect
 {
     public override StatusEffectType Type => StatusEffectType.HARD_CC;
 
-    // °øÆ÷´Â ±âÀý(Priority 0)º¸´Ù ¿ì¼±¼øÀ§°¡ ³ô´Ù.
-    public override int Priority => 1;
+    public override int Priority => 3;
 
     public Stun(int level, float duration, Entity caster = null, params object[] datas) : base(level, duration, caster, datas)
     {
     }
 
-    // »óÅÂ ÀüÈ¯Àº HardCCState°¡ Priority¿¡ µû¶ó ÀÚµ¿ Ã³¸®ÇÏ¹Ç·Î ¿©±â¼­ Á÷Á¢ º¯°æÇÏÁö ¾Ê´Â´Ù.
-    public override void OnStart(Entity target) { }
+    // ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½È¯ï¿½ï¿½ HardCCStateï¿½ï¿½ Priorityï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ ï¿½Úµï¿½ Ã³ï¿½ï¿½ï¿½Ï¹Ç·ï¿½ ï¿½ï¿½ï¿½â¼­ ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ ï¿½Ê´Â´ï¿½.
+    public override void Enter(Entity target) { }
 
-    public override void OnUpdate(Entity target) { }
+    public override void Execute(Entity target) { }
 
-    public override void OnExit(Entity target) { }
+    public override void Exit(Entity target) { }
+}
+
+public class StunState : StateBase
+{
+    private Entity fearCaster;
+    private Vector2 direction;
+
+    public StunState(Entity caster) : base(caster) { }
+
+    public override void Enter()
+    {
+        base.Enter();
+    }
+
+    public override void Execute()
+    {
+        base.Execute();
+    }
+
+    public override void FixedExecute()
+    {
+        base.FixedExecute();
+        Vector2 vel = caster.Rb2d.linearVelocity;
+        vel.x = 0f;
+        caster.Rb2d.linearVelocity = vel;
+    }
+
+    public override void Exit()
+    {
+        base.Exit();
+    }
 }

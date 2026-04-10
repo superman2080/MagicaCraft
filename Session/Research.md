@@ -1,91 +1,102 @@
-# Research — Dash 상태 구현
+# Research — 오브젝트 풀 팩토리 메서드 패턴 리팩터링
 
-## 현재 PlayerDash 코드
+## 현재 구조 분석
 
+### Pool.cs (abstract MonoBehaviour)
 ```csharp
-public class PlayerDash : StateBase
+public abstract class Pool : MonoBehaviour
 {
-    public Coroutine dashCor;
-    private Player player;
-    private DashConfig dashConfig;  // 생성자에서 할당 안 됨
+    public int initialSize = 10;
+    public Poolable prefab;           // Inspector 할당
 
-    public PlayerDash(Player caster) : base(caster)
-    {
-        player = caster;
-    }
+    // ⚠️ 버그: static instance가 추상 클래스에 선언 → 모든 서브클래스가 단 하나의 필드 공유
+    private static Pool instance;
+    public static Pool Instance { get { FindAnyObjectByType(typeof(Pool)) ... } }
 
-    public override void Enter()
-    {
-        base.Enter();
-        //dashCor = player.StartCoroutine(DashCoroutine()); // 미구현
-    }
+    private Queue<Poolable> pool;
+
+    protected virtual Poolable CreateNew() => Instantiate(prefab, transform);  // 가상 팩토리 메서드
+    public virtual Poolable Get()           // 반환형: Poolable → 호출마다 캐스팅 필요
+    public virtual Poolable Get(Vector3)
+    public virtual Poolable Get(Vector3, Quaternion)
+    public virtual Poolable Get(Vector3, Quaternion, Vector3)
+    public virtual void Return(Poolable)
 }
 ```
 
-## DashConfig (PlayerCompositeMove 내 중첩 클래스)
-
+### Poolable.cs (abstract MonoBehaviour)
 ```csharp
-[Serializable]
-public class DashConfig
+public abstract class Poolable : MonoBehaviour
 {
-    [Tooltip("대시")] public AnimationCurve dashSpeed = AnimationCurve.Linear(0, 1, 1, 0);
-    public float dashTime;
+    public virtual void OnSpawn()   { gameObject.SetActive(true); }
+    public virtual void OnDespawn() { gameObject.SetActive(false); }
 }
 ```
 
-- `dashSpeed` 커브: X = 시간 정규화(0~1), Y = 속도 배율(0~1 등)
-- `dashTime`: 대시 지속 시간(초)
-- `Player`에 `dashConfig` 필드 없음 → SerializeField로 추가 필요
-- `PlayerDash` 생성자에 전달 필요
-
-## 전환 조건 현황 (PlayerCompositeMove 생성자)
-
+### SpellProjectilePool.cs
 ```csharp
-// Walk → Dash
-() => player.InputHandler.DashPressed && dashState.dashCor == null
-
-// Dash → Walk  ← 버그
-() => player.InputHandler.DashPressed == false && dashState.dashCor != null
-```
-
-**버그 원인**: `DashPressed`는 LateUpdate에서 매 프레임 false로 초기화됨.
-Dash 상태 진입 다음 프레임에 `DashPressed == false && dashCor != null`이 즉시 참이 되어 Walk로 복귀.
-
-**올바른 조건**: `dashCor == null` — 코루틴이 종료되면 Walk로 복귀.
-
-## MoveStatType (Stat.cs)
-
-```csharp
-public enum MoveStatType
+public class SpellProjectilePool : Pool
 {
-    MOVE_SPEED,
-    JUMP_FORCE,
-    // DASH_SPEED 없음 → 추가 필요
+    // 자체 싱글톤 없음 → Pool.Instance(버그)를 통해 접근
+    protected override Poolable CreateNew()  // prefab 없으면 코드로 GameObject 생성
 }
 ```
 
-대시 기본 속도를 스탯으로 관리해야 함.
-추가 후 `MoveStatDataSO` 에셋에서 Inspector 값 설정 필요.
+### SpellProjectile.cs
+```csharp
+private void ReturnToPool()
+{
+    SpellProjectilePool.Instance.Return(this);  // ⚠️ 구체 풀 클래스 직접 참조
+}
+```
 
-## 대시 방향 결정
+### FireAction.cs
+```csharp
+var proj = SpellProjectilePool.Instance.Get() as SpellProjectile;  // ⚠️ 구체 클래스 + 캐스팅
+proj.Init(ctx, ctx.Mana, startPos, direction, speed, projObj);
+```
 
-- `MoveInput.x != 0`이면 해당 방향 사용
-- 입력 없으면 마지막으로 이동한 방향(facing direction) 사용
-- `Player`에 `float facingDirection` (1f or -1f) 유지 필요
+---
 
-## 대시 중 물리 처리
+## 문제점 정리
 
-- Dash 상태에서는 `PlayerWalk.FixedExecute()`가 실행되지 않음
-- `PlayerDash.FixedExecute()`에서 X 속도를 커브 × 기본속도 × 방향으로 직접 제어
-- Y 속도는 건드리지 않음 (중력 유지)
-- 대시 도중 점프 전환 방지: Walk→Jump 조건만 있어 Dash 중엔 Jump 불가 (현재 구조상 OK)
+| # | 문제 | 위치 |
+|---|------|------|
+| 1 | **싱글톤 버그**: `static instance`가 추상 클래스에 선언 → 서브클래스 여러 개 공존 불가 | Pool.cs:9 |
+| 2 | **비제네릭**: `Get()`이 `Poolable` 반환 → 모든 호출에서 캐스팅 필요 | Pool.cs:41-67 |
+| 3 | **강한 결합**: `SpellProjectile`이 `SpellProjectilePool.Instance` 직접 참조 | SpellProjectile.cs:149 |
+| 4 | **강한 결합**: `FireAction`이 `SpellProjectilePool.Instance` 직접 참조 | FireAction.cs:35,39 |
+| 5 | `CreateNew()`가 virtual → 서브클래스가 오버라이드 안 해도 컴파일 통과 | Pool.cs:39 |
+
+---
+
+## 팩토리 메서드 패턴 GoF 매핑
+
+| GoF 역할 | 현재 | 목표 |
+|---|---|---|
+| **Creator** (추상) | `Pool` (비제네릭, virtual factory) | `Pool<T> where T : Poolable` (abstract factory) |
+| **Factory Method** | `CreateNew()` virtual | `CreateNew()` **abstract** |
+| **ConcreteCreator** | `SpellProjectilePool : Pool` | `SpellProjectilePool : Pool<SpellProjectile>` |
+| **Product** | `Poolable` (캐스팅 필요) | `T` (타입 안전) |
+
+---
+
+## 결합 제거 전략
+
+`SpellProjectile.ReturnToPool()`과 `FireAction`의 `SpellProjectilePool` 직접 참조를 끊는 방법:
+
+- `SpellProjectile.Init()`에 `Action returnCallback` 매개변수 추가
+- `ReturnToPool()` → `_returnCallback?.Invoke()`만 호출 (풀 타입 모름)
+- `FireAction`에서 `pool.Get()` 후 `() => pool.Return(proj)` 람다를 `Init()`에 전달
+
+---
 
 ## 영향 범위
 
-| 파일 | 변경 내용 |
+| 파일 | 변경 유형 |
 |---|---|
-| `Stat.cs` | `MoveStatType`에 `DASH_SPEED` 추가 |
-| `Player.cs` | `dashConfig` SerializeField 추가, `facingDirection` 추가 |
-| `Player.cs` | `PlayerDash` 구현 (코루틴, Enter/Exit) |
-| `Player.cs` | Dash→Walk 전환 조건 수정 |
-| `MoveStatDataSO` 에셋 | Inspector에서 `DASH_SPEED` 값 설정 (코드 외 작업) |
+| `Pool.cs` | 전면 재작성 (제네릭화, abstract factory method) |
+| `SpellProjectilePool.cs` | 상속 타입 변경 (`Pool<SpellProjectile>`), 자체 싱글톤 추가 |
+| `SpellProjectile.cs` | `Init()` 시그니처 변경 (returnCallback 추가), `ReturnToPool()` 수정 |
+| `FireAction.cs` | 타입 안전한 Get() 사용, 콜백 전달 |
+| `Poolable.cs` | 변경 없음 |

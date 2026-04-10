@@ -1,6 +1,6 @@
 using UnityEngine;
 
-public abstract class Poolable: MonoBehaviour
+public abstract class Poolable : MonoBehaviour, IPoolable
 {
     public virtual void OnSpawn()
     {
