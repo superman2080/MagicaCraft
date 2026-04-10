@@ -26,7 +26,7 @@ public class StatusEffectHandler
             ((effect.Type == StatusEffectType.HARD_CC) || (effect.Type == StatusEffectType.NORMAL_CC)))
             return;
         statusEffects.Add(effect);
-        effect.OnStart(Caster);
+        effect.Enter(Caster);
     }
 
     public StatusEffect GetEffect<T>() where T : StatusEffect
@@ -77,11 +77,11 @@ public class StatusEffectHandler
         {
             if (!HasEffect<Unstoppable>()
                 || (HasEffect<Unstoppable>() && eff.Type == StatusEffectType.BUFF))
-                eff.OnUpdate(Caster);
+                eff.Execute(Caster);
             eff.Duration -= Time.deltaTime;
             if (eff.Duration <= 0)
             {
-                eff.OnExit(Caster);
+                eff.Exit(Caster);
                 delEffect.Add(eff);
             }
         }
@@ -92,7 +92,7 @@ public class StatusEffectHandler
     public void ClearEffects()
     {
         foreach (var eff in statusEffects)
-            eff.OnExit(Caster);
+            eff.Exit(Caster);
         statusEffects.Clear();
     }
 
@@ -100,7 +100,7 @@ public class StatusEffectHandler
     {
         var delEffects = statusEffects.Where(eff => eff.Type == type).ToList();
         foreach (var eff in delEffects)
-            eff.OnExit(Caster);
+            eff.Exit(Caster);
         statusEffects.RemoveAll(eff => delEffects.Contains(eff));
     }
 }

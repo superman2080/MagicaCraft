@@ -59,12 +59,13 @@ public class HardCCState : CompositeStateBase
     private static readonly Dictionary<Type, HardCCStates> effectToState = new()
     {
         { typeof(Fear), HardCCStates.Fear },
-        // { typeof(Stun), HardCCStates.Stun }, // 추후 Stun 구현 시 추가
+        { typeof(Stun), HardCCStates.Stun },
     };
 
     public HardCCState(Entity entity) : base(entity)
     {
         SubStateMachine.RegisterState(HardCCStates.Fear, new FearState(entity));
+        SubStateMachine.RegisterState(HardCCStates.Stun, new StunState(entity));
     }
 
     public override void Enter()
@@ -104,44 +105,6 @@ public class HardCCState : CompositeStateBase
 
         if (top == null) return null;
         return effectToState.TryGetValue(top.GetType(), out var key) ? key : (HardCCStates?)null;
-    }
-}
-
-public class FearState : StateBase
-{
-    private Entity fearCaster;
-
-    public FearState(Entity caster) : base(caster) { }
-
-    public override void Enter()
-    {
-        base.Enter();
-        fearCaster = caster.GetEffect<Fear>()?.Caster;
-        caster.SpriteRenderer.color = Color.gray;
-    }
-
-    public override void Execute()
-    {
-        base.Execute();
-        caster.SpriteRenderer.color = Color.gray;
-        // Stat<T>.InitStat()이 매 LateUpdate에서 배율을 1로 초기화하므로 매 프레임 재적용한다.
-        (caster as IMovable)?.MoveStat.Multiply(MoveStatType.MOVE_SPEED, 0.5f);
-    }
-
-    public override void FixedExecute()
-    {
-        base.FixedExecute();
-        Vector2 direction = fearCaster
-            ? (caster.transform.position - fearCaster.transform.position).normalized
-            : Random.insideUnitCircle.normalized;
-        caster.Rb2d.MovePosition((Vector2)caster.transform.position + direction * Time.fixedDeltaTime);
-    }
-
-    public override void Exit()
-    {
-        base.Exit();
-        caster.SpriteRenderer.color = Color.white;
-        // MOVE_SPEED 배율은 InitStat()이 다음 프레임에 자동으로 1로 복원한다.
     }
 }
 

@@ -8,15 +8,15 @@ public class Unstoppable : StatusEffect
 
     public override StatusEffectType Type => StatusEffectType.BUFF;
 
-    public override void OnExit(Entity target)
+    public override void Exit(Entity target)
     {
     }
 
-    public override void OnStart(Entity target)
+    public override void Enter(Entity target)
     {
     }
 
-    public override void OnUpdate(Entity target)
+    public override void Execute(Entity target)
     {
     }
 }

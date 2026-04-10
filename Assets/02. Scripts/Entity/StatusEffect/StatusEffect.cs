@@ -29,9 +29,9 @@ public abstract class StatusEffect
         this.Caster = caster;
     }
 
-    public abstract void OnStart(Entity target);
+    public abstract void Enter(Entity target);
 
-    public abstract void OnUpdate(Entity target);
+    public abstract void Execute(Entity target);
 
-    public abstract void OnExit(Entity target);
+    public abstract void Exit(Entity target);
 }
