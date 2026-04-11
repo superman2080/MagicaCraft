@@ -4,7 +4,7 @@ using System.Collections.Generic;
 
 public class SequenceController : MonoBehaviour
 {
-    public List<SequenceStateBase> tutorialStates;
+    public List<SequenceStateBase> queueStates;
     private Queue<SequenceStateBase> actionQueue = new Queue<SequenceStateBase>();
     public SequenceStateBase curTutorialState { get; private set; }
 
@@ -12,7 +12,7 @@ public class SequenceController : MonoBehaviour
     // Start is called once before the first execution of Update after the MonoBehaviour is created
     void Start()
     {
-        foreach (var item in tutorialStates)
+        foreach (var item in queueStates)
         {
             actionQueue.Enqueue(item);
         }

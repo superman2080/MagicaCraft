@@ -14,7 +14,7 @@ public abstract class SubUIManager : MonoBehaviour
         Canvas.sortingOrder = SortingOrder;
     }
 
-    private void Start()
+    protected virtual void Start()
     {
         UIManager.Instance.Register(this);
     }
