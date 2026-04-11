@@ -25,14 +25,14 @@ public class SpellProjectile : Poolable
 
     // ─── 내부 상태 ────────────────────────────────────────────
 
-    private SpellContext        _ctx;
-    private ManaTracker         _mana;
-    private ProjectileObject    _projObj;
-    private SpellProjectileData _data;
-    private LayerMask           _attackLayer;
-    private float               _spawnTime;
-    private bool                _isAlive;
-    private System.Action       _returnCallback;
+    private SpellContext        ctx;
+    private ManaTracker         mana;
+    private ProjectileObject    projObj;
+    private SpellProjectileData data;
+    private LayerMask           attackLayer;
+    private float               spawnTime;
+    private bool                isAlive;
+    private System.Action       returnCallback;
 
     // ─── Unity 생명주기 ───────────────────────────────────────
 
@@ -48,41 +48,41 @@ public class SpellProjectile : Poolable
 
     private void Update()
     {
-        if (!_isAlive) return;
+        if (!isAlive) return;
 
-        if (Time.time - _spawnTime > maxLifetime)
+        if (Time.time - spawnTime > maxLifetime)
         {
             ReturnToPool();
             return;
         }
 
-        if (_projObj == null) return;
+        if (projObj == null) return;
 
-        RunLifecycle(() => _projObj.RunUpdate(
-            _ctx, _mana, new Dictionary<string, object> { ["proj"] = _data }));
+        RunLifecycle(() => projObj.RunUpdate(
+            ctx, mana, new Dictionary<string, object> { ["proj"] = data }));
     }
 
     private void OnTriggerEnter2D(Collider2D other)
     {
-        if (!_isAlive) return;
+        if (!isAlive) return;
 
-        if (_ctx?.Caster != null && other.gameObject == _ctx.Caster.gameObject) return;
+        if (ctx?.Caster != null && other.gameObject == ctx.Caster.gameObject) return;
 
-        if ((_attackLayer & (1 << other.gameObject.layer)) == 0) return;
+        if ((attackLayer & (1 << other.gameObject.layer)) == 0) return;
 
         if (!other.TryGetComponent<IDamagable>(out var damagable)) return;
 
-        if (_projObj != null && other.TryGetComponent<Entity>(out var victim))
+        if (projObj != null && other.TryGetComponent<Entity>(out var victim))
         {
             // OnFinish: proj + victim 주입
-            RunLifecycle(() => _projObj.RunFinish(
-                _ctx, _mana,
-                new Dictionary<string, object> { ["proj"] = _data, ["victim"] = victim }));
+            RunLifecycle(() => projObj.RunFinish(
+                ctx, mana,
+                new Dictionary<string, object> { ["proj"] = data, ["victim"] = victim }));
         }
         else
         {
             // projObj 없을 때 기본 피격 처리
-            damagable.TakeDamage(_ctx?.Caster as IAttackable, Damage, Element);
+            damagable.TakeDamage(ctx?.Caster as IAttackable, Damage, Element);
         }
 
         ReturnToPool();
@@ -103,44 +103,44 @@ public class SpellProjectile : Poolable
         ElementType      element = ElementType.None,
         float            damage  = 0f)
     {
-        _ctx            = ctx;
-        _mana           = mana;
-        _projObj        = projObj;
-        Speed           = speed;
-        Element         = element;
-        Damage          = damage;
-        _returnCallback = returnCallback;
-        _data           = new SpellProjectileData(this);
-        _spawnTime      = Time.time;
-        _isAlive        = true;
+        this.ctx            = ctx;
+        this.mana           = mana;
+        this.projObj        = projObj;
+        Speed               = speed;
+        Element             = element;
+        Damage              = damage;
+        this.returnCallback = returnCallback;
+        data                = new SpellProjectileData(this);
+        spawnTime           = Time.time;
+        isAlive             = true;
 
         Rb2d.position       = startPos;
         Rb2d.linearVelocity = direction.normalized * speed;
 
         var attacker = ctx.Caster as IAttackable;
-        _attackLayer = attacker != null ? attacker.AttackLayer : Physics2D.AllLayers;
+        attackLayer = attacker != null ? attacker.AttackLayer : Physics2D.AllLayers;
 
         // 마나 소진 시 즉시 회수
-        _mana.OnDepleted += ReturnToPool;
+        this.mana.OnDepleted += ReturnToPool;
 
         // OnStart 실행
-        if (_projObj != null)
-            RunLifecycle(() => _projObj.RunStart(
-                _ctx, _mana, new Dictionary<string, object> { ["proj"] = _data }));
+        if (this.projObj != null)
+            RunLifecycle(() => this.projObj.RunStart(
+                this.ctx, this.mana, new Dictionary<string, object> { ["proj"] = data }));
     }
 
     public override void OnDespawn()
     {
-        _isAlive = false;
-        if (_mana != null)
+        isAlive = false;
+        if (mana != null)
         {
-            _mana.OnDepleted -= ReturnToPool;
-            _mana = null;
+            mana.OnDepleted -= ReturnToPool;
+            mana = null;
         }
-        _ctx            = null;
-        _projObj        = null;
-        _data           = null;
-        _returnCallback = null;
+        ctx            = null;
+        projObj        = null;
+        data           = null;
+        returnCallback = null;
         Rb2d.linearVelocity = Vector2.zero;
         base.OnDespawn();
     }
@@ -149,13 +149,13 @@ public class SpellProjectile : Poolable
 
     private void ReturnToPool()
     {
-        _isAlive = false;
-        _returnCallback?.Invoke();
+        isAlive = false;
+        returnCallback?.Invoke();
     }
 
     private void RunLifecycle(System.Action runner)
     {
-        if (_ctx == null) return;
+        if (ctx == null) return;
         try
         {
             runner();

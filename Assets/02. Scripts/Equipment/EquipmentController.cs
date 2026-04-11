@@ -40,6 +40,10 @@ public abstract class EquipmentController<T> where T: MonoBehaviour
         equipmentDict.Remove(part);
     }
 
+    public IEquipable<T> GetEquipPart(EquipmentPart part) => equipmentDict[part];
+
+    public Weapon<T> GetWeapon() => equipmentDict[EquipmentPart.Weapon] as Weapon<T>;
+
     public void Execute()
     {
         foreach (var equip in equipmentDict.Values)

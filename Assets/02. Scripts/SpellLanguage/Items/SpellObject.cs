@@ -14,22 +14,22 @@ public abstract class SpellObject : SpellItem
     public string OnFinishCode { get; set; } = "";
 
     // ─── AST 캐시 ─────────────────────────────────────────────
-    private ProgramNode _startAST;
-    private ProgramNode _updateAST;
-    private ProgramNode _finishAST;
-    private bool        _compiled;
+    private ProgramNode startAST;
+    private ProgramNode updateAST;
+    private ProgramNode finishAST;
+    private bool        compiled;
 
     // 세 슬롯의 코드를 한꺼번에 파싱하여 AST를 캐시한다.
     public void Compile()
     {
-        _startAST  = ParseCode(OnStartCode);
-        _updateAST = ParseCode(OnUpdateCode);
-        _finishAST = ParseCode(OnFinishCode);
-        _compiled  = true;
+        startAST  = ParseCode(OnStartCode);
+        updateAST = ParseCode(OnUpdateCode);
+        finishAST = ParseCode(OnFinishCode);
+        compiled  = true;
     }
 
     // 캐시를 무효화한다. 다음 실행 시 해당 슬롯을 자동으로 재파싱한다.
-    public void InvalidateCache() => _compiled = false;
+    public void InvalidateCache() => compiled = false;
 
     private static ProgramNode ParseCode(string code)
     {
@@ -46,7 +46,7 @@ public abstract class SpellObject : SpellItem
                          IReadOnlyDictionary<string, object> instanceVars = null)
     {
         BeforeStart();
-        RunLifecycle(ref _startAST, OnStartCode, ctx, mana, GetStartVars(), instanceVars);
+        RunLifecycle(ref startAST, OnStartCode, ctx, mana, GetStartVars(), instanceVars);
         AfterStart();
     }
 
@@ -54,7 +54,7 @@ public abstract class SpellObject : SpellItem
                           IReadOnlyDictionary<string, object> instanceVars = null)
     {
         BeforeUpdate();
-        RunLifecycle(ref _updateAST, OnUpdateCode, ctx, mana, GetUpdateVars(), instanceVars);
+        RunLifecycle(ref updateAST, OnUpdateCode, ctx, mana, GetUpdateVars(), instanceVars);
         AfterUpdate();
     }
 
@@ -62,7 +62,7 @@ public abstract class SpellObject : SpellItem
                           IReadOnlyDictionary<string, object> instanceVars = null)
     {
         BeforeFinish();
-        RunLifecycle(ref _finishAST, OnFinishCode, ctx, mana, GetFinishVars(), instanceVars);
+        RunLifecycle(ref finishAST, OnFinishCode, ctx, mana, GetFinishVars(), instanceVars);
         AfterFinish();
     }
 
@@ -90,7 +90,7 @@ public abstract class SpellObject : SpellItem
     {
         if (string.IsNullOrWhiteSpace(code)) return;
 
-        if (!_compiled || ast == null)
+        if (!compiled || ast == null)
             ast = ParseCode(code);
 
         // 타입별 변수와 인스턴스 변수를 병합

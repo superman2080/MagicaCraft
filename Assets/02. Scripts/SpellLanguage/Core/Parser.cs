@@ -10,13 +10,13 @@ using System.Globalization;
 //   or → and → equality → comparison → addition → multiplication → unary → postfix → primary
 public class Parser
 {
-    private readonly List<Token> _tokens;
-    private int _pos;
+    private readonly List<Token> tokens;
+    private int pos;
 
     public Parser(List<Token> tokens)
     {
-        _tokens = tokens;
-        _pos    = 0;
+        this.tokens = tokens;
+        pos    = 0;
     }
 
     // 진입점: 전체 소스를 파싱해 ProgramNode를 반환한다.
@@ -340,15 +340,15 @@ public class Parser
 
     #region 내부 헬퍼
 
-    private Token Current() => _tokens[_pos];
+    private Token Current() => tokens[pos];
 
     // pos+offset 위치 토큰을 반환 (범위 초과 시 마지막 토큰 반환)
-    private Token Peek(int offset) => _tokens[Math.Min(_pos + offset, _tokens.Count - 1)];
+    private Token Peek(int offset) => tokens[Math.Min(pos + offset, tokens.Count - 1)];
 
     private Token Advance()
     {
-        var t = _tokens[_pos];
-        if (!IsEnd()) _pos++;
+        var t = tokens[pos];
+        if (!IsEnd()) pos++;
         return t;
     }
 

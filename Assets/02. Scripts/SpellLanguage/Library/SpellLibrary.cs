@@ -9,36 +9,36 @@ using System.Collections.Generic;
 //   4. ApplyToContext(ctx) — 해금된 아이템을 SpellContext에 반영
 public class SpellLibrary
 {
-    private readonly Dictionary<string, SpellItem> _registry = new();
-    private readonly HashSet<string>               _unlocked  = new();
+    private readonly Dictionary<string, SpellItem> registry = new();
+    private readonly HashSet<string>               unlocked  = new();
 
     // SpellItem을 레지스트리에 등록한다 (해금 없이 DB에만 추가).
     public void Register(SpellItem item)
     {
-        if (item != null) _registry[item.Name] = item;
+        if (item != null) registry[item.Name] = item;
     }
 
     // 특정 이름의 아이템을 해금한다.
-    public void Unlock(string name) => _unlocked.Add(name);
+    public void Unlock(string name) => unlocked.Add(name);
 
     // 해당 티어의 모든 아이템을 해금한다.
     public void UnlockTier(int tier)
     {
-        foreach (var (name, item) in _registry)
+        foreach (var (name, item) in registry)
             if (item.Tier == tier)
-                _unlocked.Add(name);
+                unlocked.Add(name);
     }
 
-    public bool IsUnlocked(string name) => _unlocked.Contains(name);
+    public bool IsUnlocked(string name) => unlocked.Contains(name);
 
     // 해금된 아이템을 SpellContext에 적용한다.
     //   SpellAction  → 명령어로 등록
     //   SpellObject  → SpellObject 변수로 등록
     public void ApplyToContext(SpellContext ctx)
     {
-        foreach (var name in _unlocked)
+        foreach (var name in unlocked)
         {
-            if (!_registry.TryGetValue(name, out var item)) continue;
+            if (!registry.TryGetValue(name, out var item)) continue;
 
             switch (item)
             {

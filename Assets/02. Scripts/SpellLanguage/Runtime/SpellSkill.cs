@@ -96,7 +96,7 @@ public class SpellSkill
     // RunOnUpdate / RunOnEnd 진입 시 즉시 반환한다.
     public bool IsCancelled { get; private set; }
 
-    private ManaTracker _subscribedMana;
+    private ManaTracker subscribedMana;
 
     // ─── 라이프사이클 실행 ────────────────────────────────────
 
@@ -107,7 +107,7 @@ public class SpellSkill
         IsCancelled = false;
 
         // 마나 소진 구독 (Continuous는 Cancel, OneShot도 중단 신호 용도)
-        _subscribedMana = mana;
+        subscribedMana = mana;
         mana.OnDepleted += Cancel;
 
         ctx.Mana.Spend(ManaCost, 0, 0);
@@ -141,10 +141,10 @@ public class SpellSkill
 
     private void Unsubscribe()
     {
-        if (_subscribedMana != null)
+        if (subscribedMana != null)
         {
-            _subscribedMana.OnDepleted -= Cancel;
-            _subscribedMana = null;
+            subscribedMana.OnDepleted -= Cancel;
+            subscribedMana = null;
         }
     }
 

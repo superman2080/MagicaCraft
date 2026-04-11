@@ -131,6 +131,7 @@ namespace PlayerNamespace
             private Player player;
             private DashConfig dashConfig;
             private float dashDir;
+            private float originalGravityScale;
 
             public PlayerDash(Player caster, DashConfig config) : base(caster)
             {
@@ -145,12 +146,19 @@ namespace PlayerNamespace
                     ? Mathf.Sign(player.InputHandler.MoveInput.x)
                     : player.FacingDirection;
 
+                originalGravityScale = caster.Rb2d.gravityScale;
+                caster.Rb2d.gravityScale = 0f;
+                var vel = caster.Rb2d.linearVelocity;
+                vel.y = 0f;
+                caster.Rb2d.linearVelocity = vel;
+
                 dashCor = player.StartCoroutine(DashCoroutine());
             }
 
             public override void Exit()
             {
                 base.Exit();
+                caster.Rb2d.gravityScale = originalGravityScale;
                 if (dashCor != null)
                 {
                     player.StopCoroutine(dashCor);
@@ -160,7 +168,6 @@ namespace PlayerNamespace
 
             private IEnumerator DashCoroutine()
             {
-
                 for (float elapsed = 0; elapsed < dashConfig.dashTime; elapsed += Time.fixedDeltaTime)
                 {
                     float t = elapsed / dashConfig.dashTime;
@@ -168,6 +175,7 @@ namespace PlayerNamespace
 
                     Vector2 vel = caster.Rb2d.linearVelocity;
                     vel.x = dashDir * speed;
+                    vel.y = 0f;
                     caster.Rb2d.linearVelocity = vel;
 
                     yield return null;

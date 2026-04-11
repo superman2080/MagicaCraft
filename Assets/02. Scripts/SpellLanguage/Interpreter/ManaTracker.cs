@@ -8,9 +8,9 @@ using System;
 // SpellProjectile·SpellSkill이 구독하여 마나 소진 시 즉시 중단한다.
 public class ManaTracker
 {
-    private readonly Resource _mana;
+    private readonly Resource mana;
 
-    public float Remaining => _mana.CurrentValue;
+    public float Remaining => mana.CurrentValue;
 
     // 마나가 완전히 소진될 때 발생한다 (Resource.OnDepleted 위임).
     // SpellProjectile: 구독 시 ReturnToPool
@@ -19,19 +19,19 @@ public class ManaTracker
 
     public ManaTracker(Resource mana)
     {
-        _mana = mana;
-        _mana.OnDepleted += () => OnDepleted?.Invoke();
+        this.mana = mana;
+        this.mana.OnDepleted += () => OnDepleted?.Invoke();
     }
 
     // 마나를 소비한다. 부족하면 OutOfManaException을 던진다.
     public void Spend(float amount, int line = 0, int col = 0)
     {
-        if (!_mana.TryConsume(amount))
-            throw new OutOfManaException(amount, _mana.CurrentValue, line, col);
+        if (!mana.TryConsume(amount))
+            throw new OutOfManaException(amount, mana.CurrentValue, line, col);
     }
 
     // 소비 가능 여부만 확인한다 (시전 전 UI 표시용)
-    public bool CanAfford(float amount) => _mana.CurrentValue >= amount;
+    public bool CanAfford(float amount) => mana.CurrentValue >= amount;
 }
 
 // 마나 부족 예외

@@ -17,12 +17,12 @@ public class SpellContext
     // 게임 명령어 레지스트리
     // key  : 명령어 이름 (Bolt, Heal, Explode …)
     // value: (평가된 인자 목록, 컨텍스트, 줄번호, 열번호) → 반환값
-    private readonly Dictionary<string, Func<List<object>, SpellContext, int, int, object>> _commands = new();
+    private readonly Dictionary<string, Func<List<object>, SpellContext, int, int, object>> commands = new();
 
     // 플레이어가 보유한 SpellObject 레지스트리
     // key  : DSL에서 참조할 변수명 (예: "basicBolt")
     // value: SpellObject 인스턴스
-    private readonly Dictionary<string, SpellObject> _spellObjects = new();
+    private readonly Dictionary<string, SpellObject> spellObjects = new();
 
     public SpellContext(Entity caster, Entity target)
     {
@@ -36,9 +36,9 @@ public class SpellContext
     // 등록 후 인터프리터 생성 전에 호출해야 InjectBuiltins에서 반영된다.
     // 예: ctx.RegisterSpellObject("basicBolt", obj) → DSL에서 Fire(basicBolt, ...) 사용 가능
     public void RegisterSpellObject(string name, SpellObject obj)
-        => _spellObjects[name] = obj;
+        => spellObjects[name] = obj;
 
-    public void UnregisterSpellObject(string name) => _spellObjects.Remove(name);
+    public void UnregisterSpellObject(string name) => spellObjects.Remove(name);
 
     #endregion
 
@@ -47,15 +47,15 @@ public class SpellContext
     // 게임 명령어를 등록한다 (게임 초기화 시 또는 해금 시 호출)
     public void RegisterCommand(string name, Func<List<object>, SpellContext, int, int, object> impl)
     {
-        _commands[name] = impl;
+        commands[name] = impl;
     }
 
-    public bool HasCommand(string name) => _commands.ContainsKey(name);
+    public bool HasCommand(string name) => commands.ContainsKey(name);
 
     // 등록된 명령어를 실행한다. 미등록 명령어는 RuntimeException
     public object ExecuteCommand(string name, List<object> args, int line, int col)
     {
-        if (!_commands.TryGetValue(name, out var cmd))
+        if (!commands.TryGetValue(name, out var cmd))
             throw new RuntimeException(
                 $"'{name}'은 해금되지 않았거나 존재하지 않는 명령어입니다.", line, col);
 
@@ -90,7 +90,7 @@ public class SpellContext
 
         // 등록된 SpellObject를 DSL 변수로 주입
         // 예: ctx.RegisterSpellObject("basicBolt", obj) → DSL에서 basicBolt로 접근
-        foreach (var (name, obj) in _spellObjects)
+        foreach (var (name, obj) in spellObjects)
             env.Define(name, obj);
     }
 

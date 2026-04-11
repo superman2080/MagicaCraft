@@ -48,19 +48,19 @@ public class SpellDebugUI : MonoBehaviour
 
     // ─── 내부 상태 ────────────────────────────────────────────
 
-    private GameObject      _panel;
-    private RectTransform   _panelRect;
-    private TMP_InputField  _codeInput;
-    private TextMeshProUGUI _logText;
-    private ScrollRect      _logScroll;
-    private TextMeshProUGUI _manaLabel;
-    private TextMeshProUGUI _casterLabel;
-    private TextMeshProUGUI _targetLabel;
+    private GameObject      panel;
+    private RectTransform   panelRect;
+    private TMP_InputField  codeInput;
+    private TextMeshProUGUI logText;
+    private ScrollRect      logScroll;
+    private TextMeshProUGUI manaLabel;
+    private TextMeshProUGUI casterLabel;
+    private TextMeshProUGUI targetLabel;
 
-    private readonly StringBuilder _log = new();
-    private Resource   _manaResource;
-    private bool       _isDragging;
-    private Vector2    _dragOffset;
+    private readonly StringBuilder log = new();
+    private Resource   manaResource;
+    private bool       isDragging;
+    private Vector2    dragOffset;
 
     // ─── 기본 예시 코드 ───────────────────────────────────────
 
@@ -86,10 +86,10 @@ public class SpellDebugUI : MonoBehaviour
     {
         // 토글
         if (Input.GetKeyDown(toggleKey))
-            _panel.SetActive(!_panel.activeSelf);
+            panel.SetActive(!panel.activeSelf);
 
         // Ctrl + Enter — 실행
-        if (_panel.activeSelf &&
+        if (panel.activeSelf &&
             Input.GetKey(KeyCode.LeftControl) &&
             Input.GetKeyDown(KeyCode.Return))
         {
@@ -97,10 +97,10 @@ public class SpellDebugUI : MonoBehaviour
         }
 
         // 드래그
-        if (_isDragging)
+        if (isDragging)
         {
             Vector2 mouse = Input.mousePosition;
-            _panelRect.anchoredPosition = mouse + _dragOffset;
+            panelRect.anchoredPosition = mouse + dragOffset;
         }
     }
 
@@ -121,18 +121,18 @@ public class SpellDebugUI : MonoBehaviour
         canvasGo.AddComponent<GraphicRaycaster>();
 
         // ── Panel ─────────────────────────────────────────────
-        _panel = MakeRect("DebugPanel", canvasGo.transform);
-        _panelRect = _panel.GetComponent<RectTransform>();
-        _panelRect.sizeDelta        = panelSize;
-        _panelRect.anchorMin        = new Vector2(0.5f, 0.5f);
-        _panelRect.anchorMax        = new Vector2(0.5f, 0.5f);
-        _panelRect.anchoredPosition = Vector2.zero;
+        panel = MakeRect("DebugPanel", canvasGo.transform);
+        panelRect = panel.GetComponent<RectTransform>();
+        panelRect.sizeDelta        = panelSize;
+        panelRect.anchorMin        = new Vector2(0.5f, 0.5f);
+        panelRect.anchorMax        = new Vector2(0.5f, 0.5f);
+        panelRect.anchoredPosition = Vector2.zero;
 
-        var panelImg = _panel.AddComponent<Image>();
+        var panelImg = panel.AddComponent<Image>();
         panelImg.color = BgPanel;
 
         // 세로 레이아웃
-        var vLayout = _panel.AddComponent<VerticalLayoutGroup>();
+        var vLayout = panel.AddComponent<VerticalLayoutGroup>();
         vLayout.childControlWidth      = true;
         vLayout.childControlHeight     = true;
         vLayout.childForceExpandWidth  = true;
@@ -141,22 +141,22 @@ public class SpellDebugUI : MonoBehaviour
         vLayout.padding                = new RectOffset(0, 0, 0, 0);
 
         // ── Header ────────────────────────────────────────────
-        BuildHeader(_panel.transform);
+        BuildHeader(panel.transform);
 
         // ── Context bar ───────────────────────────────────────
-        BuildContextBar(_panel.transform);
+        BuildContextBar(panel.transform);
 
         // ── Code editor ───────────────────────────────────────
-        BuildCodeEditor(_panel.transform);
+        BuildCodeEditor(panel.transform);
 
         // ── Button bar ────────────────────────────────────────
-        BuildButtonBar(_panel.transform);
+        BuildButtonBar(panel.transform);
 
         // ── Log panel ─────────────────────────────────────────
-        BuildLogPanel(_panel.transform);
+        BuildLogPanel(panel.transform);
 
         // 기본 코드 삽입
-        _codeInput.text = DefaultCode;
+        codeInput.text = DefaultCode;
 
         AppendLog("<color=#5C6370>─── Spell Debug Console ────────────────────────</color>");
         AppendLog($"<color=#5C6370>토글: {toggleKey}  실행: Ctrl+Enter  디버그 명령어: Print(value)</color>");
@@ -184,11 +184,11 @@ public class SpellDebugUI : MonoBehaviour
         var trigger = header.AddComponent<EventTrigger>();
         AddTrigger(trigger, EventTriggerType.PointerDown, _ =>
         {
-            _isDragging = true;
+            isDragging = true;
             // ConstantPixelSize Canvas: mousePosition == anchoredPosition 좌표계
-            _dragOffset = _panelRect.anchoredPosition - (Vector2)Input.mousePosition;
+            dragOffset = panelRect.anchoredPosition - (Vector2)Input.mousePosition;
         });
-        AddTrigger(trigger, EventTriggerType.PointerUp, _ => _isDragging = false);
+        AddTrigger(trigger, EventTriggerType.PointerUp, _ => isDragging = false);
 
         // 닫기 버튼
         var closeBtn = MakeButton("CloseBtn", header.transform, "✕",
@@ -199,7 +199,7 @@ public class SpellDebugUI : MonoBehaviour
         closeBtnRect.pivot     = new Vector2(1, 0.5f);
         closeBtnRect.offsetMin = new Vector2(-32, 4);
         closeBtnRect.offsetMax = new Vector2(-4, -4);
-        closeBtn.GetComponent<Button>().onClick.AddListener(() => _panel.SetActive(false));
+        closeBtn.GetComponent<Button>().onClick.AddListener(() => panel.SetActive(false));
     }
 
     // ─── 컨텍스트 바 (Caster / Target / Mana) ────────────────
@@ -220,23 +220,23 @@ public class SpellDebugUI : MonoBehaviour
         hLayout.spacing  = 0;
         hLayout.padding  = new RectOffset(8, 8, 4, 4);
 
-        _casterLabel = MakeText("CasterLabel", bar.transform,
+        casterLabel = MakeText("CasterLabel", bar.transform,
             GetEntityLabel("Caster", caster), 11, ColMuted);
-        SetWidth(_casterLabel.gameObject, 210);
+        SetWidth(casterLabel.gameObject, 210);
 
-        _targetLabel = MakeText("TargetLabel", bar.transform,
+        targetLabel = MakeText("TargetLabel", bar.transform,
             GetEntityLabel("Target", target), 11, ColMuted);
-        SetWidth(_targetLabel.gameObject, 210);
+        SetWidth(targetLabel.gameObject, 210);
 
         // 오른쪽 마나 표시
         var spacer = MakeRect("Spacer", bar.transform);
         var spacerEl = spacer.AddComponent<LayoutElement>();
         spacerEl.flexibleWidth = 1;
 
-        _manaLabel = MakeText("ManaLabel", bar.transform,
+        manaLabel = MakeText("ManaLabel", bar.transform,
             $"Mana: {maxMana:F0}/{maxMana:F0}", 11, new Color(0.78f, 0.67f, 0.94f));
-        SetWidth(_manaLabel.gameObject, 150);
-        _manaLabel.alignment = TextAlignmentOptions.Right;
+        SetWidth(manaLabel.gameObject, 150);
+        manaLabel.alignment = TextAlignmentOptions.Right;
     }
 
     // ─── 코드 에디터 ─────────────────────────────────────────
@@ -251,9 +251,9 @@ public class SpellDebugUI : MonoBehaviour
         var wrapperImg = wrapper.AddComponent<Image>();
         wrapperImg.color = BgInput;
 
-        _codeInput = BuildInputField(wrapper.transform,
+        codeInput = BuildInputField(wrapper.transform,
             "// DSL 코드를 입력하세요...\n// 예: Fire(self.position, Vec2(1,0), Fire, 50, 10)");
-        var inputRect = _codeInput.GetComponent<RectTransform>();
+        var inputRect = codeInput.GetComponent<RectTransform>();
         inputRect.anchorMin = Vector2.zero;
         inputRect.anchorMax = Vector2.one;
         inputRect.offsetMin = new Vector2(4, 4);
@@ -292,7 +292,7 @@ public class SpellDebugUI : MonoBehaviour
         SetWidth(resetBtn, 100);
         resetBtn.GetComponent<Button>().onClick.AddListener(() =>
         {
-            _manaResource?.SetToMax();
+            manaResource?.SetToMax();
             UpdateManaLabel();
             AppendLog("<color=#61AEEF>  마나 초기화됨.</color>");
             RefreshLog();
@@ -318,11 +318,11 @@ public class SpellDebugUI : MonoBehaviour
         wrapper.AddComponent<Image>().color = BgLog;
 
         // ScrollRect 설정
-        _logScroll = wrapper.AddComponent<ScrollRect>();
-        _logScroll.horizontal = false;
-        _logScroll.vertical   = true;
-        _logScroll.scrollSensitivity = 20f;
-        _logScroll.movementType = ScrollRect.MovementType.Clamped;
+        logScroll = wrapper.AddComponent<ScrollRect>();
+        logScroll.horizontal = false;
+        logScroll.vertical   = true;
+        logScroll.scrollSensitivity = 20f;
+        logScroll.movementType = ScrollRect.MovementType.Clamped;
 
         // Viewport
         var viewport = MakeRect("Viewport", wrapper.transform);
@@ -332,7 +332,7 @@ public class SpellDebugUI : MonoBehaviour
         vpRect.offsetMin = new Vector2(6, 4);
         vpRect.offsetMax = new Vector2(-6, -4);
         viewport.AddComponent<RectMask2D>();
-        _logScroll.viewport = vpRect;
+        logScroll.viewport = vpRect;
 
         // Content
         var content = MakeRect("Content", viewport.transform);
@@ -352,16 +352,16 @@ public class SpellDebugUI : MonoBehaviour
         vl.childForceExpandWidth  = true;
         vl.childForceExpandHeight = false;
 
-        _logScroll.content = contentRect;
+        logScroll.content = contentRect;
 
         // 로그 텍스트
         var logGo = MakeRect("LogText", content.transform);
-        _logText = logGo.AddComponent<TextMeshProUGUI>();
-        _logText.fontSize     = 12;
-        _logText.color        = ColText;
-        _logText.richText     = true;
-        _logText.enableWordWrapping = false;
-        _logText.overflowMode = TextOverflowModes.Overflow;
+        logText = logGo.AddComponent<TextMeshProUGUI>();
+        logText.fontSize     = 12;
+        logText.color        = ColText;
+        logText.richText     = true;
+        logText.enableWordWrapping = false;
+        logText.overflowMode = TextOverflowModes.Overflow;
     }
 
     // ─────────────────────────────────────────────────────────
@@ -370,9 +370,9 @@ public class SpellDebugUI : MonoBehaviour
 
     private void RunCode()
     {
-        _log.Clear();
+        log.Clear();
 
-        string code = _codeInput.text;
+        string code = codeInput.text;
         if (string.IsNullOrWhiteSpace(code))
         {
             AppendLog("<color=#E5C07B>코드가 비어 있습니다.</color>");
@@ -389,8 +389,8 @@ public class SpellDebugUI : MonoBehaviour
         }
 
         // 마나 리소스 초기화
-        _manaResource = new Resource(maxMana, 0f);
-        var manaTracker = new ManaTracker(_manaResource);
+        manaResource = new Resource(maxMana, 0f);
+        var manaTracker = new ManaTracker(manaResource);
         UpdateManaLabel();
 
         AppendLog($"<color=#5C6370>──────────────────────────────────────────────────</color>");
@@ -421,13 +421,13 @@ public class SpellDebugUI : MonoBehaviour
 
             // ── 결과 ──────────────────────────────────────────
             float ms    = (Time.realtimeSinceStartup - t0) * 1000f;
-            float spent = maxMana - _manaResource.CurrentValue;
+            float spent = maxMana - manaResource.CurrentValue;
 
             AppendLog($"<color=#98C379>✓ 완료</color>  " +
                       $"<color=#5C6370>({ms:F1} ms)</color>");
             if (spent > 0.01f)
                 AppendLog($"<color=#C678DD>  마나 소모: {spent:F0}  " +
-                           $"(남음: {_manaResource.CurrentValue:F0}/{maxMana})</color>");
+                           $"(남음: {manaResource.CurrentValue:F0}/{maxMana})</color>");
         }
         catch (OutOfManaException ex)
         {
@@ -469,29 +469,29 @@ public class SpellDebugUI : MonoBehaviour
     // 로그 유틸
     // ─────────────────────────────────────────────────────────
 
-    private void AppendLog(string line) => _log.AppendLine(line);
+    private void AppendLog(string line) => log.AppendLine(line);
 
     private void ClearLog()
     {
-        _log.Clear();
+        log.Clear();
         RefreshLog();
     }
 
     private void RefreshLog()
     {
-        if (_logText == null) return;
-        _logText.text = _log.ToString();
+        if (logText == null) return;
+        logText.text = log.ToString();
 
         // 다음 프레임에 스크롤 최하단 이동
         Canvas.ForceUpdateCanvases();
-        _logScroll.verticalNormalizedPosition = 0f;
+        logScroll.verticalNormalizedPosition = 0f;
     }
 
     private void UpdateManaLabel()
     {
-        if (_manaLabel == null || _manaResource == null) return;
-        _manaLabel.text =
-            $"Mana: {_manaResource.CurrentValue:F0}/{maxMana:F0}";
+        if (manaLabel == null || manaResource == null) return;
+        manaLabel.text =
+            $"Mana: {manaResource.CurrentValue:F0}/{maxMana:F0}";
     }
 
     // ─────────────────────────────────────────────────────────

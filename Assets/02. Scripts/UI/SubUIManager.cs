@@ -1,0 +1,24 @@
+using UnityEngine;
+using UnityEngine.UI;
+
+public abstract class SubUIManager : MonoBehaviour
+{
+    public abstract int SortingOrder { get; }
+
+    public Canvas Canvas { get; private set; }
+    public bool IsVisible => gameObject.activeSelf;
+
+    protected virtual void Awake()
+    {
+        Canvas = GetComponent<Canvas>();
+        Canvas.sortingOrder = SortingOrder;
+    }
+
+    private void Start()
+    {
+        UIManager.Instance.Register(this);
+    }
+
+    public void Show() => gameObject.SetActive(true);
+    public void Hide() => gameObject.SetActive(false);
+}

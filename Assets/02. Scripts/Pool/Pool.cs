@@ -14,7 +14,7 @@ public class Pool : Singleton<Pool>
     [SerializeField] private SerializedDictionary<PoolKey, Poolable> prefabs = new();
     [SerializeField] private int initialSize = 5;
 
-    private readonly Dictionary<PoolKey, Queue<IPoolable>> _pools = new();
+    private readonly Dictionary<PoolKey, Queue<IPoolable>> pools = new();
 
     private void Start()
     {
@@ -27,7 +27,7 @@ public class Pool : Singleton<Pool>
                 obj.OnDespawn();
                 queue.Enqueue(obj);
             }
-            _pools[kvp.Key] = queue;
+            pools[kvp.Key] = queue;
         }
     }
 
@@ -41,8 +41,8 @@ public class Pool : Singleton<Pool>
 
     private IPoolable GetInternal(PoolKey key)
     {
-        if (!_pools.TryGetValue(key, out var queue))
-            _pools[key] = queue = new Queue<IPoolable>();
+        if (!pools.TryGetValue(key, out var queue))
+            pools[key] = queue = new Queue<IPoolable>();
         return queue.Count > 0 ? queue.Dequeue() : CreateNew(key);
     }
 
@@ -65,8 +65,8 @@ public class Pool : Singleton<Pool>
     public void Return(PoolKey key, IPoolable obj)
     {
         obj.OnDespawn();
-        if (!_pools.TryGetValue(key, out var queue))
-            _pools[key] = queue = new Queue<IPoolable>();
+        if (!pools.TryGetValue(key, out var queue))
+            pools[key] = queue = new Queue<IPoolable>();
         queue.Enqueue(obj);
     }
 }

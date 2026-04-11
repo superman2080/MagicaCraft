@@ -2,7 +2,7 @@ using UnityEngine;
 
 public class Singleton<T> : MonoBehaviour where T : MonoBehaviour
 {
-    protected readonly bool dontDestroy;
+    protected readonly bool dontDestroy = false;
 
     private static T instance;
     public static T Instance

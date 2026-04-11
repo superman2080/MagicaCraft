@@ -16,9 +16,9 @@ using UnityEngine;
 //   null          - 값 없음
 public class Interpreter
 {
-    private readonly SpellContext     _ctx;
-    private readonly ManaTracker      _mana;
-    private readonly SpellEnvironment _env;
+    private readonly SpellContext     ctx;
+    private readonly ManaTracker      mana;
+    private readonly SpellEnvironment env;
 
     // 단일 loop/while의 최대 반복 횟수 (무한 루프 방지)
     private const int MaxIterations = 1000;
@@ -29,17 +29,17 @@ public class Interpreter
     public Interpreter(SpellContext ctx, ManaTracker mana,
                        Dictionary<string, object> extraVars = null)
     {
-        _ctx  = ctx;
-        _mana = mana;
-        _env  = new SpellEnvironment();
+        this.ctx  = ctx;
+        this.mana = mana;
+        env  = new SpellEnvironment();
 
-        _ctx.Mana = _mana;
-        _ctx.InjectBuiltins(_env);
+        this.ctx.Mana = this.mana;
+        this.ctx.InjectBuiltins(env);
         RegisterBuiltins();
 
         if (extraVars != null)
             foreach (var (key, val) in extraVars)
-                _env.Define(key, val);
+                env.Define(key, val);
     }
 
     // ─── 진입점 ───────────────────────────────────────────────
@@ -81,13 +81,13 @@ public class Interpreter
     // let x = expr;
     private void ExecuteLet(LetStmt s)
     {
-        _env.Define(s.Name, EvalExpr(s.Initializer));
+        env.Define(s.Name, EvalExpr(s.Initializer));
     }
 
     // x = expr;
     private void ExecuteAssign(AssignStmt s)
     {
-        _env.Set(s.Name, EvalExpr(s.Value), s.Line, s.Column);
+        env.Set(s.Name, EvalExpr(s.Value), s.Line, s.Column);
     }
 
     // if (expr) { ... } else { ... }
@@ -134,14 +134,14 @@ public class Interpreter
     private void ExecuteDef(DefStmt s)
     {
         // 명령어 또는 내장 함수와 동일한 이름으로 재정의하는 것을 차단한다.
-        if (_ctx.HasCommand(s.Name))
+        if (ctx.HasCommand(s.Name))
             throw new RuntimeException(
                 $"'{s.Name}'은 마법 명령어이므로 재정의할 수 없습니다.", s.Line, s.Column);
-        if (_env.IsDefined(s.Name) && _env.Get(s.Name, s.Line, s.Column) is SpellBuiltin)
+        if (env.IsDefined(s.Name) && env.Get(s.Name, s.Line, s.Column) is SpellBuiltin)
             throw new RuntimeException(
                 $"'{s.Name}'은 내장 함수이므로 재정의할 수 없습니다.", s.Line, s.Column);
 
-        _env.Define(s.Name, new SpellFunction(s.Name, s.Params, s.Body));
+        env.Define(s.Name, new SpellFunction(s.Name, s.Params, s.Body));
     }
 
     // return expr;  /  return;
@@ -155,7 +155,7 @@ public class Interpreter
     // { stmt* } — 새 스코프 생성 후 실행, 종료 시 반드시 해제
     private void ExecuteBlock(List<Stmt> stmts)
     {
-        _env.PushScope();
+        env.PushScope();
         try
         {
             foreach (var stmt in stmts)
@@ -163,7 +163,7 @@ public class Interpreter
         }
         finally
         {
-            _env.PopScope();
+            env.PopScope();
         }
     }
 
@@ -176,7 +176,7 @@ public class Interpreter
             NumberExpr     e => e.Value,
             StringExpr     e => e.Value,
             BoolExpr       e => e.Value,
-            IdentifierExpr e => _env.Get(e.Name, e.Line, e.Column),
+            IdentifierExpr e => env.Get(e.Name, e.Line, e.Column),
             MemberExpr     e => EvalMember(e),
             CallExpr       e => EvalCall(e),
             BinaryExpr     e => EvalBinary(e),
@@ -253,9 +253,9 @@ public class Interpreter
             args.Add(EvalExpr(arg));
 
         // 환경에서 먼저 탐색 (사용자 정의 함수 + 내장 함수)
-        if (_env.IsDefined(name))
+        if (env.IsDefined(name))
         {
-            var val = _env.Get(name, e.Line, e.Column);
+            var val = env.Get(name, e.Line, e.Column);
             return val switch
             {
                 SpellFunction fn      => CallSpellFunction(fn, args, e.Line, e.Column),
@@ -269,7 +269,7 @@ public class Interpreter
         }
 
         // 게임 명령어 탐색 (bolt, heal 등)
-        return _ctx.ExecuteCommand(name, args, e.Line, e.Column);
+        return ctx.ExecuteCommand(name, args, e.Line, e.Column);
     }
 
     // 사용자 정의 함수 호출
@@ -285,7 +285,7 @@ public class Interpreter
             extraVars[fn.Params[i]] = args[i];
 
         // 마나를 공유하는 격리된 인터프리터로 실행
-        var fnInterp = new Interpreter(_ctx, _mana, extraVars);
+        var fnInterp = new Interpreter(ctx, mana, extraVars);
         object returnValue = null;
         try
         {
@@ -450,7 +450,7 @@ public class Interpreter
     private void RegisterBuiltins()
     {
         // Vec2(x, y) : Vector2 생성
-        _env.Define("Vec2", new SpellBuiltin((args, line, col) =>
+        env.Define("Vec2", new SpellBuiltin((args, line, col) =>
         {
             if (args.Count != 2)
                 throw new RuntimeException("Vec2(x, y): 인자 2개 필요", line, col);
@@ -459,7 +459,7 @@ public class Interpreter
         }));
 
         // Distance(a, b) : 두 위치 간의 거리 (double 반환)
-        _env.Define("Distance", new SpellBuiltin((args, line, col) =>
+        env.Define("Distance", new SpellBuiltin((args, line, col) =>
         {
             if (args.Count != 2)
                 throw new RuntimeException("Distance(a, b): 인자 2개 필요", line, col);
@@ -468,7 +468,7 @@ public class Interpreter
         }));
 
         // Abs(x)
-        _env.Define("Abs", new SpellBuiltin((args, line, col) =>
+        env.Define("Abs", new SpellBuiltin((args, line, col) =>
         {
             if (args.Count != 1)
                 throw new RuntimeException("Abs(x): 인자 1개 필요", line, col);
@@ -476,14 +476,14 @@ public class Interpreter
         }));
 
         // Min(a, b) / Max(a, b)
-        _env.Define("Min", new SpellBuiltin((args, line, col) =>
+        env.Define("Min", new SpellBuiltin((args, line, col) =>
         {
             if (args.Count != 2)
                 throw new RuntimeException("Min(a, b): 인자 2개 필요", line, col);
             return Math.Min(ToDouble(args[0], line, col), ToDouble(args[1], line, col));
         }));
 
-        _env.Define("Max", new SpellBuiltin((args, line, col) =>
+        env.Define("Max", new SpellBuiltin((args, line, col) =>
         {
             if (args.Count != 2)
                 throw new RuntimeException("Max(a, b): 인자 2개 필요", line, col);
@@ -491,14 +491,14 @@ public class Interpreter
         }));
 
         // Floor(x) / Ceil(x)
-        _env.Define("Floor", new SpellBuiltin((args, line, col) =>
+        env.Define("Floor", new SpellBuiltin((args, line, col) =>
         {
             if (args.Count != 1)
                 throw new RuntimeException("Floor(x): 인자 1개 필요", line, col);
             return Math.Floor(ToDouble(args[0], line, col));
         }));
 
-        _env.Define("Ceil", new SpellBuiltin((args, line, col) =>
+        env.Define("Ceil", new SpellBuiltin((args, line, col) =>
         {
             if (args.Count != 1)
                 throw new RuntimeException("Ceil(x): 인자 1개 필요", line, col);
@@ -506,7 +506,7 @@ public class Interpreter
         }));
 
         // Sqrt(x) : 제곱근
-        _env.Define("Sqrt", new SpellBuiltin((args, line, col) =>
+        env.Define("Sqrt", new SpellBuiltin((args, line, col) =>
         {
             if (args.Count != 1)
                 throw new RuntimeException("Sqrt(x): 인자 1개 필요", line, col);
@@ -517,14 +517,14 @@ public class Interpreter
         }));
 
         // Normalize(vec) : Vec2를 단위 벡터로 반환
-        _env.Define("Normalize", new SpellBuiltin((args, line, col) =>
+        env.Define("Normalize", new SpellBuiltin((args, line, col) =>
         {
             if (args.Count != 1)
                 throw new RuntimeException("Normalize(vec): 인자 1개 필요", line, col);
             return (object)ToVector2(args[0], line, col).normalized;
         }));
 
-        _env.Define("GetMousePosition", new SpellBuiltin((args, line, col) =>
+        env.Define("GetMousePosition", new SpellBuiltin((args, line, col) =>
         {
             if (args.Count != 0)
                 throw new RuntimeException("GetMousePosition(): 인자 필요 없음", line, col);
@@ -539,11 +539,11 @@ public class Interpreter
 // SpellEnvironment에 일반 값처럼 저장되며, SpellFunction(사용자 정의)과 구분된다.
 public class SpellBuiltin
 {
-    private readonly Func<List<object>, int, int, object> _impl;
+    private readonly Func<List<object>, int, int, object> impl;
 
-    public SpellBuiltin(Func<List<object>, int, int, object> impl) { _impl = impl; }
+    public SpellBuiltin(Func<List<object>, int, int, object> impl) { this.impl = impl; }
 
-    public object Call(List<object> args, int line, int col) => _impl(args, line, col);
+    public object Call(List<object> args, int line, int col) => impl(args, line, col);
 }
 
 // 사용자 정의 함수 (def)

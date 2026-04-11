@@ -65,6 +65,33 @@ MCP(Unity Editor 연동)를 통해 작업할 때:
 
 ---
 
+## C# 코딩 컨벤션
+
+모든 C# 코드는 아래 규칙을 따른다. 예외 없음.
+
+### 네이밍
+
+| 대상 | 규칙 | 예 |
+|---|---|---|
+| 클래스 / 구조체 / 열거형 / 인터페이스 | PascalCase | `PlayerDash`, `IAttackable` |
+| 메서드 / 프로퍼티 / 이벤트 / 상수 | PascalCase | `TakeDamage()`, `IsGrounded`, `OnDied` |
+| **private / protected 필드** | **camelCase (언더스코어 없음)** | `dashDir`, `originalGravityScale` |
+| 로컬 변수 / 파라미터 | camelCase | `elapsed`, `dashConfig` |
+| `const` 필드 | PascalCase | `MaxIterations` |
+| 열거형 값 | PascalCase | `PlayerState.Idle`, `ElementType.Fire` |
+
+### 기타 규칙
+
+- `var` 사용: 우변에서 타입이 명확히 추론될 때만 사용
+- `string` / `int` / `float` 등 C# 키워드 타입 사용 (`String` / `Int32` 대신)
+- 접근 제한자 명시 생략 금지 — `private`, `public`, `protected` 항상 작성
+- 한 줄에 하나의 선언
+- 중괄호는 Allman 스타일 (여는 중괄호 다음 줄)
+- 코루틴 내부 반복문: 무한 반복은 `while (true)`, **시간 제한 반복은 `for`** 사용
+  - 예: `for (float eT = 0; eT < totalTime; eT += Time.deltaTime) { ... yield return null; }`
+
+---
+
 ## 개발 워크플로우
 
 빌드·실행·테스트 모두 **Unity Editor**에서 진행합니다. CLI 빌드 파이프라인 없음.

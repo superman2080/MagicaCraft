@@ -1,102 +1,78 @@
-# Research — 오브젝트 풀 팩토리 메서드 패턴 리팩터링
+# Research: UIManager 설계
 
-## 현재 구조 분석
+## 목표
 
-### Pool.cs (abstract MonoBehaviour)
-```csharp
-public abstract class Pool : MonoBehaviour
-{
-    public int initialSize = 10;
-    public Poolable prefab;           // Inspector 할당
-
-    // ⚠️ 버그: static instance가 추상 클래스에 선언 → 모든 서브클래스가 단 하나의 필드 공유
-    private static Pool instance;
-    public static Pool Instance { get { FindAnyObjectByType(typeof(Pool)) ... } }
-
-    private Queue<Poolable> pool;
-
-    protected virtual Poolable CreateNew() => Instantiate(prefab, transform);  // 가상 팩토리 메서드
-    public virtual Poolable Get()           // 반환형: Poolable → 호출마다 캐스팅 필요
-    public virtual Poolable Get(Vector3)
-    public virtual Poolable Get(Vector3, Quaternion)
-    public virtual Poolable Get(Vector3, Quaternion, Vector3)
-    public virtual void Return(Poolable)
-}
-```
-
-### Poolable.cs (abstract MonoBehaviour)
-```csharp
-public abstract class Poolable : MonoBehaviour
-{
-    public virtual void OnSpawn()   { gameObject.SetActive(true); }
-    public virtual void OnDespawn() { gameObject.SetActive(false); }
-}
-```
-
-### SpellProjectilePool.cs
-```csharp
-public class SpellProjectilePool : Pool
-{
-    // 자체 싱글톤 없음 → Pool.Instance(버그)를 통해 접근
-    protected override Poolable CreateNew()  // prefab 없으면 코드로 GameObject 생성
-}
-```
-
-### SpellProjectile.cs
-```csharp
-private void ReturnToPool()
-{
-    SpellProjectilePool.Instance.Return(this);  // ⚠️ 구체 풀 클래스 직접 참조
-}
-```
-
-### FireAction.cs
-```csharp
-var proj = SpellProjectilePool.Instance.Get() as SpellProjectile;  // ⚠️ 구체 클래스 + 캐스팅
-proj.Init(ctx, ctx.Mana, startPos, direction, speed, projObj);
-```
+인게임 UI 전체를 총괄하는 싱글톤 `UIManager`와,
+각 레이어별 UI를 담당하는 `SubUIManager` 계층 구조 설계.
 
 ---
 
-## 문제점 정리
+## 기존 코드 분석
 
-| # | 문제 | 위치 |
-|---|------|------|
-| 1 | **싱글톤 버그**: `static instance`가 추상 클래스에 선언 → 서브클래스 여러 개 공존 불가 | Pool.cs:9 |
-| 2 | **비제네릭**: `Get()`이 `Poolable` 반환 → 모든 호출에서 캐스팅 필요 | Pool.cs:41-67 |
-| 3 | **강한 결합**: `SpellProjectile`이 `SpellProjectilePool.Instance` 직접 참조 | SpellProjectile.cs:149 |
-| 4 | **강한 결합**: `FireAction`이 `SpellProjectilePool.Instance` 직접 참조 | FireAction.cs:35,39 |
-| 5 | `CreateNew()`가 virtual → 서브클래스가 오버라이드 안 해도 컴파일 통과 | Pool.cs:39 |
+### Singleton<T> — `Utils/Singleton.cs`
+
+```csharp
+public class Singleton<T> : MonoBehaviour where T : MonoBehaviour
+{
+    private static T instance;
+    public static T Instance { get; }   // 없으면 자동 생성
+    protected virtual void Awake()      // dontDestroy 처리
+}
+```
+- `UIManager : Singleton<UIManager>` 패턴으로 바로 적용 가능.
+- `dontDestroy`는 `readonly bool` — 서브클래스에서 생성자 override 불가. 필요 시 `Awake`에서 직접 처리.
+
+### TimerManager — `Utils/TimerManager.cs`
+- `Singleton<TimerManager>` 상속의 실제 구현 예시.
+- 자체 `private List` 보유, 의존 객체들은 외부에서 주입.
+
+### `Assets/02. Scripts/UI/` 폴더
+- 현재 비어 있음 — 신규 구현.
 
 ---
 
-## 팩토리 메서드 패턴 GoF 매핑
+## Unity UI 레이어링 방식
 
-| GoF 역할 | 현재 | 목표 |
+Unity에서 UI 레이어 우선순위는 **Canvas의 `sortingOrder`** 로 제어한다.
+- `ScreenSpaceOverlay` Canvas는 `sortingOrder` 높을수록 앞에 렌더링.
+- 각 레이어마다 Canvas GameObject를 분리하면 레이어 단위 Show/Hide 가능.
+
+---
+
+## 제안 레이어 구조
+
+| 레이어 클래스 | sortingOrder | 용도 |
 |---|---|---|
-| **Creator** (추상) | `Pool` (비제네릭, virtual factory) | `Pool<T> where T : Poolable` (abstract factory) |
-| **Factory Method** | `CreateNew()` virtual | `CreateNew()` **abstract** |
-| **ConcreteCreator** | `SpellProjectilePool : Pool` | `SpellProjectilePool : Pool<SpellProjectile>` |
-| **Product** | `Poolable` (캐스팅 필요) | `T` (타입 안전) |
+| `BackgroundLayer` | 0 | 배경 패널, 월드 UI |
+| `HUDLayer` | 100 | HP바, 마나바, 스킬 버튼 |
+| `MenuLayer` | 200 | 인벤토리, 스킬트리, 설정 |
+| `PopupLayer` | 300 | 확인 다이얼로그, 툴팁 |
+| `OverlayLayer` | 400 | 로딩화면, 페이드, 알림 |
 
 ---
 
-## 결합 제거 전략
+## 의존성 및 영향 범위
 
-`SpellProjectile.ReturnToPool()`과 `FireAction`의 `SpellProjectilePool` 직접 참조를 끊는 방법:
-
-- `SpellProjectile.Init()`에 `Action returnCallback` 매개변수 추가
-- `ReturnToPool()` → `_returnCallback?.Invoke()`만 호출 (풀 타입 모름)
-- `FireAction`에서 `pool.Get()` 후 `() => pool.Return(proj)` 람다를 `Init()`에 전달
+- 신규 파일만 생성. 기존 코드 변경 없음.
+- `SpellDebugUI.cs`는 별도 Canvas를 직접 생성하므로 UIManager와 무관하게 유지.
+- `Singleton<T>` 그대로 활용.
 
 ---
 
-## 영향 범위
+## 핵심 설계 결정
 
-| 파일 | 변경 유형 |
-|---|---|
-| `Pool.cs` | 전면 재작성 (제네릭화, abstract factory method) |
-| `SpellProjectilePool.cs` | 상속 타입 변경 (`Pool<SpellProjectile>`), 자체 싱글톤 추가 |
-| `SpellProjectile.cs` | `Init()` 시그니처 변경 (returnCallback 추가), `ReturnToPool()` 수정 |
-| `FireAction.cs` | 타입 안전한 Get() 사용, 콜백 전달 |
-| `Poolable.cs` | 변경 없음 |
+### SubUIManager — abstract MonoBehaviour
+- 각 레이어 Canvas를 소유
+- `Show()` / `Hide()` / `IsVisible` 공통 인터페이스 제공
+- 구체 타입에서 레이어별 UI 요소를 추가로 정의
+
+### UIManager
+- 각 레이어를 **명명된 프로퍼티**로 노출 (`UIManager.Instance.HUD`, `.Popup` 등)
+- `Awake`에서 레이어 GameObject를 자식으로 생성하고 SubUIManager 컴포넌트를 추가
+- 정렬 순서는 `UILayerOrder` 상수 클래스로 중앙 관리
+
+### 레이어 생성 헬퍼
+```csharp
+private T CreateLayer<T>(int sortingOrder) where T : SubUIManager
+```
+Canvas + CanvasScaler + GraphicRaycaster를 자동으로 추가해 보일러플레이트 제거.

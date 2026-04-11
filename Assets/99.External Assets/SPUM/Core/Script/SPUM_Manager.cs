@@ -15,7 +15,7 @@ public class SPUM_Animator{
 public class SPUM_Manager : MonoBehaviour
 {
     public float _version;
-    public string unitPath = "Assets/SPUM/Resources/Units/"; // 프리펩 저장 장소
+    public string unitPath = "Assets/99.External Assets/SPUM Prefabs/Resources/Units/"; // 프리펩 저장 장소
     public string unitBackUpPath = "Assets/SPUM/Backup/";
     public bool isSaveSamePath = false;
     public SPUM_Prefabs EditPrefab;

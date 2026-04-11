@@ -22,7 +22,7 @@ public static class ElementChart
     // 행(Row)    = 공격 속성 (ElementType enum 순서)
     // 열(Column) = 방어 속성 (ElementType enum 순서)
     // None=0, Fire=1, Water=2, Ice=3, Lightning=4, Earth=5, Wind=6, Light=7, Dark=8
-    private static readonly float[,] _chart =
+    private static readonly float[,] chart =
     {
         //              None   Fire   Water  Ice    Lightning  Earth  Wind   Light  Dark
         /* None      */ { 1.0f, 1.0f,  1.0f,  1.0f,  1.0f,     1.0f,  1.0f,  1.0f,  1.0f },
@@ -39,7 +39,7 @@ public static class ElementChart
     // 공격 속성 → 방어 속성 엔티티에 대한 데미지 배율을 반환한다.
     public static float GetMultiplier(ElementType attacker, ElementType defender)
     {
-        return _chart[(int)attacker, (int)defender];
+        return chart[(int)attacker, (int)defender];
     }
 
     // 복합 속성(이중 속성)을 가진 엔티티에 대한 최종 배율을 계산한다.

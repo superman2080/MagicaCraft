@@ -6,10 +6,10 @@ using System.Text;
 // 파이프라인: 소스 문자열 → Lexer → List<Token> → Parser
 public class Lexer
 {
-    private readonly string _source;
-    private int _pos;
-    private int _line;
-    private int _col;
+    private readonly string source;
+    private int pos;
+    private int line;
+    private int col;
 
     // 키워드 테이블: 식별자를 읽은 뒤 키워드 여부를 O(1)로 판별한다.
     private static readonly Dictionary<string, TokenType> Keywords = new()
@@ -27,10 +27,10 @@ public class Lexer
 
     public Lexer(string source)
     {
-        _source = source;
-        _pos    = 0;
-        _line   = 1;
-        _col    = 1;
+        this.source = source;
+        pos    = 0;
+        line   = 1;
+        col    = 1;
     }
 
     // 소스 전체를 토큰 목록으로 변환한다.
@@ -39,7 +39,7 @@ public class Lexer
     {
         var tokens = new List<Token>();
 
-        while (true)
+        for (;;)
         {
             SkipWhitespaceAndComments();
 
@@ -72,7 +72,7 @@ public class Lexer
     // 소수점이 두 번 나오거나 다음 문자가 숫자가 아니면 멤버 접근 연산자로 판단해 중단
     private Token ReadNumber()
     {
-        int line = _line, col = _col;
+        int startLine = line, startCol = col;
         var sb       = new StringBuilder();
         bool isFloat = false;
 
@@ -81,41 +81,41 @@ public class Lexer
             if (Current() == '.')
             {
                 if (isFloat) break;
-                if (_pos + 1 >= _source.Length || !char.IsDigit(_source[_pos + 1])) break;
+                if (pos + 1 >= source.Length || !char.IsDigit(source[pos + 1])) break;
                 isFloat = true;
             }
             sb.Append(Advance());
         }
 
         var type = isFloat ? TokenType.Float : TokenType.Int;
-        return new Token(type, sb.ToString(), line, col);
+        return new Token(type, sb.ToString(), startLine, startCol);
     }
 
     // 문자열 리터럴 ("...")
     private Token ReadString()
     {
-        int line = _line, col = _col;
+        int startLine = line, startCol = col;
         Advance(); // 여는 " 소비
 
         var sb = new StringBuilder();
         while (!IsEnd() && Current() != '"')
         {
             if (Current() == '\n')
-                throw new LexerException("문자열이 닫히지 않았습니다.", line, col);
+                throw new LexerException("문자열이 닫히지 않았습니다.", startLine, startCol);
             sb.Append(Advance());
         }
 
         if (IsEnd())
-            throw new LexerException("문자열이 닫히지 않았습니다.", line, col);
+            throw new LexerException("문자열이 닫히지 않았습니다.", startLine, startCol);
 
         Advance(); // 닫는 " 소비
-        return new Token(TokenType.String, sb.ToString(), line, col);
+        return new Token(TokenType.String, sb.ToString(), startLine, startCol);
     }
 
     // 식별자 / 키워드
     private Token ReadIdentifier()
     {
-        int line = _line, col = _col;
+        int startLine = line, startCol = col;
         var sb = new StringBuilder();
 
         while (!IsEnd() && (char.IsLetterOrDigit(Current()) || Current() == '_'))
@@ -123,49 +123,49 @@ public class Lexer
 
         var text = sb.ToString();
         var type = Keywords.TryGetValue(text, out var kw) ? kw : TokenType.Identifier;
-        return new Token(type, text, line, col);
+        return new Token(type, text, startLine, startCol);
     }
 
     // 연산자 및 구분자
     private Token ReadSymbol()
     {
-        int line = _line, col = _col;
+        int startLine = line, startCol = col;
         char c = Advance();
 
         return c switch
         {
-            '+' => new Token(TokenType.Plus,      "+",  line, col),
-            '-' => new Token(TokenType.Minus,     "-",  line, col),
-            '*' => new Token(TokenType.Star,      "*",  line, col),
-            '/' => new Token(TokenType.Slash,     "/",  line, col),
-            '%' => new Token(TokenType.Percent,   "%",  line, col),
-            '.' => new Token(TokenType.Dot,       ".",  line, col),
-            '{' => new Token(TokenType.LBrace,    "{",  line, col),
-            '}' => new Token(TokenType.RBrace,    "}",  line, col),
-            '(' => new Token(TokenType.LParen,    "(",  line, col),
-            ')' => new Token(TokenType.RParen,    ")",  line, col),
-            ',' => new Token(TokenType.Comma,     ",",  line, col),
-            ';' => new Token(TokenType.Semicolon, ";",  line, col),
+            '+' => new Token(TokenType.Plus,      "+",  startLine, startCol),
+            '-' => new Token(TokenType.Minus,     "-",  startLine, startCol),
+            '*' => new Token(TokenType.Star,      "*",  startLine, startCol),
+            '/' => new Token(TokenType.Slash,     "/",  startLine, startCol),
+            '%' => new Token(TokenType.Percent,   "%",  startLine, startCol),
+            '.' => new Token(TokenType.Dot,       ".",  startLine, startCol),
+            '{' => new Token(TokenType.LBrace,    "{",  startLine, startCol),
+            '}' => new Token(TokenType.RBrace,    "}",  startLine, startCol),
+            '(' => new Token(TokenType.LParen,    "(",  startLine, startCol),
+            ')' => new Token(TokenType.RParen,    ")",  startLine, startCol),
+            ',' => new Token(TokenType.Comma,     ",",  startLine, startCol),
+            ';' => new Token(TokenType.Semicolon, ";",  startLine, startCol),
 
-            '=' => Match('=') ? new Token(TokenType.Eq,     "==", line, col)
-                              : new Token(TokenType.Assign,  "=",  line, col),
+            '=' => Match('=') ? new Token(TokenType.Eq,     "==", startLine, startCol)
+                              : new Token(TokenType.Assign,  "=",  startLine, startCol),
 
-            '!' => Match('=') ? new Token(TokenType.Neq,    "!=", line, col)
-                              : new Token(TokenType.Not,     "!",  line, col),
+            '!' => Match('=') ? new Token(TokenType.Neq,    "!=", startLine, startCol)
+                              : new Token(TokenType.Not,     "!",  startLine, startCol),
 
-            '<' => Match('=') ? new Token(TokenType.Lte,    "<=", line, col)
-                              : new Token(TokenType.Lt,      "<",  line, col),
+            '<' => Match('=') ? new Token(TokenType.Lte,    "<=", startLine, startCol)
+                              : new Token(TokenType.Lt,      "<",  startLine, startCol),
 
-            '>' => Match('=') ? new Token(TokenType.Gte,    ">=", line, col)
-                              : new Token(TokenType.Gt,      ">",  line, col),
+            '>' => Match('=') ? new Token(TokenType.Gte,    ">=", startLine, startCol)
+                              : new Token(TokenType.Gt,      ">",  startLine, startCol),
 
-            '&' => Match('&') ? new Token(TokenType.And,    "&&", line, col)
-                              : throw new LexerException("'&' 단독 사용 불가. '&&'를 사용하세요.", line, col),
+            '&' => Match('&') ? new Token(TokenType.And,    "&&", startLine, startCol)
+                              : throw new LexerException("'&' 단독 사용 불가. '&&'를 사용하세요.", startLine, startCol),
 
-            '|' => Match('|') ? new Token(TokenType.Or,     "||", line, col)
-                              : throw new LexerException("'|' 단독 사용 불가. '||'를 사용하세요.", line, col),
+            '|' => Match('|') ? new Token(TokenType.Or,     "||", startLine, startCol)
+                              : throw new LexerException("'|' 단독 사용 불가. '||'를 사용하세요.", startLine, startCol),
 
-            _ => throw new LexerException($"알 수 없는 문자 '{c}'입니다.", line, col),
+            _ => throw new LexerException($"알 수 없는 문자 '{c}'입니다.", startLine, startCol),
         };
     }
 
@@ -187,8 +187,8 @@ public class Lexer
             else if (c == '\n')
             {
                 Advance();
-                _line++;
-                _col = 1;
+                line++;
+                col = 1;
             }
             else if (c == '#') // 한 줄 주석
             {
@@ -206,28 +206,28 @@ public class Lexer
 
     #region 내부 헬퍼
 
-    private char Current() => _source[_pos];
+    private char Current() => source[pos];
 
     // 현재 문자를 반환하고 위치를 한 칸 전진한다.
     private char Advance()
     {
-        char c = _source[_pos++];
-        _col++;
+        char c = source[pos++];
+        col++;
         return c;
     }
 
     // 다음 문자가 expected와 같으면 소비하고 true를 반환한다.
     private bool Match(char expected)
     {
-        if (IsEnd() || _source[_pos] != expected) return false;
+        if (IsEnd() || source[pos] != expected) return false;
         Advance();
         return true;
     }
 
-    private bool IsEnd() => _pos >= _source.Length;
+    private bool IsEnd() => pos >= source.Length;
 
     // 현재 위치 기반으로 토큰을 생성한다.
-    private Token Make(TokenType type, string value) => new Token(type, value, _line, _col);
+    private Token Make(TokenType type, string value) => new Token(type, value, line, col);
 
     #endregion
 }
