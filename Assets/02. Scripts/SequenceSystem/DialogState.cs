@@ -1,40 +1,35 @@
 using UnityEngine;
 using System.Collections.Generic;
 
-public class TutorialDialogState : SequenceStateBase
+public class DialogState : SequenceStateBase
 {
     public List<DialogData> datas;
     private bool finishDialog = false;
-    private Entity[] entities;
     private DialogUI dialogUI;
+    private float lastTimeScale;
 
-    public TutorialDialogState(SequenceController controller) : base(controller)
+
+    public DialogState(SequenceController controller) : base(controller)
     {
     }
 
     public override void Enter()
     {
-        entities = FindObjectsByType<Entity>(FindObjectsSortMode.InstanceID);
-        //foreach (var entity in entities)
-        //{
-        //    entity.canBehavior = false;
-        //}
-        //UIManager.Instance.dialogSystem.SetDialog(datas, () => {
-        //    finishDialog = true;
-        //});
-    }
+        base.Enter();
+        lastTimeScale = Time.timeScale;
+        Time.timeScale = 0;
+        dialogUI = UIManager.Instance.Get<DialogUI>();
+        dialogUI.Dialog.SetActive(true);
+        dialogUI.SetDialog(datas);
 
-    public override void Execute()
-    {
-        //if (finishDialog == true)
-        //    caster.SetNextTutorial();
+        dialogUI.OnExit += () => finishDialog = true;
     }
 
     public override void Exit()
     {
-        foreach (var entity in entities)
-        {
-            //entity.canBehavior = true;
-        }
+        Time.timeScale = lastTimeScale;
+        base.Exit();
     }
+
+    public override bool FinishSequenceCondition() => finishDialog == true;
 }

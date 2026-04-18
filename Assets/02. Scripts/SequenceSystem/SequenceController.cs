@@ -1,13 +1,14 @@
 using UnityEngine;
 using System.Collections;
 using System.Collections.Generic;
+using System;
 
 public class SequenceController : MonoBehaviour
 {
     public List<SequenceStateBase> queueStates;
     private Queue<SequenceStateBase> actionQueue = new Queue<SequenceStateBase>();
-    public SequenceStateBase curTutorialState { get; private set; }
-
+    public SequenceStateBase CurTutorialState { get; private set; }
+    public Action OnFinishSequence;
 
     // Start is called once before the first execution of Update after the MonoBehaviour is created
     void Start()
@@ -16,30 +17,46 @@ public class SequenceController : MonoBehaviour
         {
             actionQueue.Enqueue(item);
         }
-        curTutorialState = actionQueue.Dequeue();
-        curTutorialState.Enter();
+        CurTutorialState = actionQueue.Dequeue();
+        CurTutorialState.Enter();
     }
 
     // Update is called once per frame
     void Update()
     {
-        curTutorialState?.Execute();
+        CurTutorialState?.Execute();
     }
 
     void FixedUpdate()
     {
-        curTutorialState?.FixedExecute();
+        CurTutorialState?.FixedExecute();
     }
 
-    public void SetNextTutorial()
+    private void LateUpdate()
     {
-        curTutorialState?.Exit();
+        CheckNextSequence();
+    }
+
+    private void CheckNextSequence()
+    {
+        if (CurTutorialState == null)
+            return;
+        if (CurTutorialState.FinishSequenceCondition())
+            SetNextSequence();
+    }
+
+    public void SetNextSequence()
+    {
+        CurTutorialState?.Exit();
         if (actionQueue.TryDequeue(out SequenceStateBase state))
         {
-            curTutorialState = state;
-            curTutorialState.Enter();
+            CurTutorialState = state;
+            CurTutorialState?.Enter();
         }
         else
-            curTutorialState = null;
+        {
+            CurTutorialState = null;
+            OnFinishSequence?.Invoke();
+        }
     }
 }

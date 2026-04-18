@@ -11,47 +11,65 @@ public struct DialogData
     public float printTime;
     public string name;
     [TextArea(3, 10)] public string script;
+    [Range(0, 1)] public float skipProgress;
 }
+
 public class DialogUI : SubUIManager
 {
+    public GameObject Dialog => dialog;
     [SerializeField] private GameObject dialog;
     [SerializeField] private TextMeshProUGUI dialogName;
     [SerializeField] private TextMeshProUGUI dialogScript;
     [SerializeField] private Button nextDialog;
+
+
     private Queue<DialogData> dialogQueue = new Queue<DialogData>();
     private Coroutine dialogCor;
+    // 현재 데이터
     private DialogData nowData;
+    //현재 텍스트 진행도
+    private float progress;
+
+    public Action OnExit;
 
     public override int SortingOrder => sortingOrder;
     [SerializeField] private int sortingOrder;
 
-    protected override void Awake()
+    private void Reset()
     {
-        base.Awake();
-        dialog ??= transform.Find("Dialog").gameObject;
-        dialogName ??= dialog.transform.Find("Name").GetComponent<TextMeshProUGUI>();
-        dialogScript ??= dialog.transform.Find("Script").GetComponent<TextMeshProUGUI>();
+        dialog = transform.Find("Dialog").gameObject;
+        dialogName = dialog.transform.Find("Name").GetComponent<TextMeshProUGUI>();
+        dialogScript = dialog.transform.Find("Script").GetComponent<TextMeshProUGUI>();
         nextDialog = dialog.transform.Find("Next").GetComponent<Button>();
         dialog.SetActive(false);
     }
 
-    public void SetDialog(List<DialogData> datas, Action exit, bool startImmediately = true)
+    protected override void Awake()
+    {
+        base.Awake();
+        Reset();
+    }
+
+    public void SetDialog(List<DialogData> datas, bool startImmediately = true)
     {
         nextDialog.onClick.RemoveAllListeners();
         nextDialog.onClick.AddListener(() =>
         {
-            NextDialog(exit);
+            NextDialog();
         });
         foreach (var data in datas)
         {
             dialogQueue.Enqueue(data);
         }
         if (startImmediately)
-            NextDialog(exit);
+            NextDialog();
     }
 
-    private void NextDialog(Action action)
+    private void NextDialog()
     {
+        if (nowData.skipProgress > progress)
+            return;
+
         if (dialogCor != null)
         {
             StopCoroutine(dialogCor);
@@ -59,14 +77,15 @@ public class DialogUI : SubUIManager
             dialogName.text = nowData.name;
             dialogScript.text = nowData.script;
         }
-        else if (dialogQueue.TryDequeue(out DialogData data))
+
+        if (dialogQueue.TryDequeue(out DialogData data))
         {
             nowData = data;
             dialogCor = StartCoroutine(PrintDialogScript(nowData));
         }
         else
         {
-            action?.Invoke();
+            OnExit?.Invoke();
             dialog.SetActive(false);
         }
     }
@@ -74,6 +93,7 @@ public class DialogUI : SubUIManager
     private IEnumerator PrintDialogScript(DialogData data)
     {
         dialog.SetActive(true);
+        progress = 0f;
         dialogName.text = data.name;
         dialogScript.text = "";
         int visibleCount = CountVisibleChars(data.script);
@@ -92,8 +112,12 @@ public class DialogUI : SubUIManager
                 }
             }
             dialogScript.text += data.script[i];
+            //Debug.Log($"{data.script.Length}, {dialogScript.text.Length}");
+            float nowScriptLength = CountVisibleChars(dialogScript.text);
+            progress = nowScriptLength / (float)visibleCount;
             yield return waitTime;
         }
+        progress = 1f;
         dialogCor = null;
     }
 

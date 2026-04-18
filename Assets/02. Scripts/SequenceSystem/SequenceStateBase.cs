@@ -11,8 +11,8 @@ public abstract class SequenceStateBase : MonoBehaviour, IState
 
     public virtual void Enter() { }
     public virtual void Execute() { }
-    public virtual void Exit() {
-        controller.SetNextTutorial();
-    }
     public virtual void FixedExecute() { }
+    public virtual void Exit() { }
+
+    public abstract bool FinishSequenceCondition();
 }
