@@ -1529,7 +1529,10 @@ MonoBehaviour:
     _serializedList:
     - Key: 0
       Value: {fileID: 0}
-  initialSize: 5
+  initialSizes:
+    _serializedList:
+    - Key: 0
+      Value: 10
 --- !u!4 &1446879748
 Transform:
   m_ObjectHideFlags: 0
@@ -1544,6 +1547,55 @@ Transform:
   m_ConstrainProportionsScale: 0
   m_Children: []
   m_Father: {fileID: 0}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!1 &1804503544
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 1804503546}
+  - component: {fileID: 1804503545}
+  m_Layer: 0
+  m_Name: Dialog (2)
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!114 &1804503545
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1804503544}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: bd914ba4f4baf6b43a2cf3a29df170a6, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  datas:
+  - printTime: 2
+    name: 2
+    script: This text is <color=#FF0000>test script</color>
+    skipProgress: 0.75
+--- !u!4 &1804503546
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1804503544}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 2091938638}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!1 &1843390180
 GameObject:
@@ -1593,7 +1645,56 @@ MonoBehaviour:
   - printTime: 2
     name: 2
     script: This text is <color=#FF0000>test script</color>
-    skipProgress: 0.5
+    skipProgress: 0.75
+--- !u!1 &1883347321
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 1883347323}
+  - component: {fileID: 1883347322}
+  m_Layer: 0
+  m_Name: Dialog (1)
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!114 &1883347322
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1883347321}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: bd914ba4f4baf6b43a2cf3a29df170a6, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  datas:
+  - printTime: 2
+    name: 2
+    script: This text is <color=#FF0000>test script</color>
+    skipProgress: 0.75
+--- !u!4 &1883347323
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1883347321}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 2091938638}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!1 &1891775695
 GameObject:
   m_ObjectHideFlags: 0
@@ -1797,6 +1898,8 @@ Transform:
   m_ConstrainProportionsScale: 0
   m_Children:
   - {fileID: 1843390181}
+  - {fileID: 1883347323}
+  - {fileID: 1804503546}
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!114 &2091938639
@@ -1813,9 +1916,8 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   queueStates:
   - {fileID: 1843390182}
-  - {fileID: 0}
-  - {fileID: 0}
-  - {fileID: 0}
+  - {fileID: 1883347322}
+  - {fileID: 1804503545}
 --- !u!1660057539 &9223372036854775807
 SceneRoots:
   m_ObjectHideFlags: 0

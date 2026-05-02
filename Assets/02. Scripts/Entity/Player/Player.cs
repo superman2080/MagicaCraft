@@ -74,12 +74,6 @@ namespace PlayerNamespace
                 SubStateMachine.ChangeState(PlayerMoveState.Walk);
         }
 
-        public override void Execute()
-        {
-            base.Execute();
-            Debug.Log(SubStateMachine.CurState.ToString());
-        }
-
         public class PlayerWalk : StateBase
         {
             private Player player;

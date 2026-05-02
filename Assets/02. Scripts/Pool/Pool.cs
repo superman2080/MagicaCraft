@@ -12,16 +12,18 @@ public enum PoolKey
 public class Pool : Singleton<Pool>
 {
     [SerializeField] private SerializedDictionary<PoolKey, Poolable> prefabs = new();
-    [SerializeField] private int initialSize = 5;
+    [SerializeField] private SerializedDictionary<PoolKey, int> initialSizes = new();
 
     private readonly Dictionary<PoolKey, Queue<IPoolable>> pools = new();
+    private readonly int defaultSize = 5;
 
     private void Start()
     {
         foreach (var kvp in prefabs)
         {
             var queue = new Queue<IPoolable>();
-            for (int i = 0; i < initialSize; i++)
+            int size = initialSizes.TryGetValue(kvp.Key, out int s) ? s : defaultSize;
+            for (int i = 0; i < size; i++)
             {
                 var obj = CreateNew(kvp.Key);
                 obj.OnDespawn();

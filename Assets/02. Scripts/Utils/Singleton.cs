@@ -1,8 +1,8 @@
 using UnityEngine;
 
-public class Singleton<T> : MonoBehaviour where T : MonoBehaviour
+public abstract class Singleton<T> : MonoBehaviour where T : MonoBehaviour
 {
-    protected readonly bool dontDestroy = false;
+    protected virtual bool DontDestroy { get; set; } = false;
 
     private static T instance;
     public static T Instance
@@ -26,7 +26,7 @@ public class Singleton<T> : MonoBehaviour where T : MonoBehaviour
 
     protected virtual void Awake()
     {
-        if (dontDestroy == false)
+        if (DontDestroy == false)
             return;
 
         if (transform.parent != null && transform.root != null)

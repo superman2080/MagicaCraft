@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using UnityEngine;
 
@@ -9,9 +10,17 @@ using UnityEngine;
 //   2. Update()   → item.OnUpdate 실행 (매 프레임)
 //   3. 충돌       → item.OnEnd 실행 (proj + victim 주입). item 없으면 기본 데미지
 //   4. 수명 초과  → 자동 반환
+//
+// 노드 시스템 전용 이벤트:
+//   OnHit    — OnTriggerEnter2D 시 피격 Entity와 함께 발생 (ProjectileNode가 구독)
+//   OnExpire — 수명 만료 또는 마나 소진 시 발생 (OnHit 이후 ReturnToPool에서는 발생 안 함)
 [RequireComponent(typeof(Rigidbody2D)), RequireComponent(typeof(CircleCollider2D))]
 public class SpellProjectile : Poolable
 {
+    // ─── 노드 시스템 이벤트 ───────────────────────────────────
+    public event Action<Entity> OnHit;
+    public event Action         OnExpire;
+
     [Tooltip("투사체 수명 (초). 이 시간이 지나면 자동 반환된다.")]
     [SerializeField] private float maxLifetime = 5f;
 
@@ -32,6 +41,7 @@ public class SpellProjectile : Poolable
     private LayerMask           attackLayer;
     private float               spawnTime;
     private bool                isAlive;
+    private bool                hitOccurred;   // true이면 ReturnToPool 시 OnExpire 미발생
     private System.Action       returnCallback;
 
     // ─── Unity 생명주기 ───────────────────────────────────────
@@ -52,6 +62,7 @@ public class SpellProjectile : Poolable
 
         if (Time.time - spawnTime > maxLifetime)
         {
+            OnExpire?.Invoke();
             ReturnToPool();
             return;
         }
@@ -72,17 +83,22 @@ public class SpellProjectile : Poolable
 
         if (!other.TryGetComponent<IDamagable>(out var damagable)) return;
 
+        hitOccurred = true;
+
         if (projObj != null && other.TryGetComponent<Entity>(out var victim))
         {
             // OnFinish: proj + victim 주입
             RunLifecycle(() => projObj.RunFinish(
                 ctx, mana,
                 new Dictionary<string, object> { ["proj"] = data, ["victim"] = victim }));
+            OnHit?.Invoke(victim);
         }
         else
         {
-            // projObj 없을 때 기본 피격 처리
+            // projObj 없을 때 기본 피격 처리 + 노드 이벤트
             damagable.TakeDamage(ctx?.Caster as IAttackable, Damage, Element);
+            if (other.TryGetComponent<Entity>(out var hitEntity))
+                OnHit?.Invoke(hitEntity);
         }
 
         ReturnToPool();
@@ -113,6 +129,7 @@ public class SpellProjectile : Poolable
         data                = new SpellProjectileData(this);
         spawnTime           = Time.time;
         isAlive             = true;
+        hitOccurred         = false;
 
         Rb2d.position       = startPos;
         Rb2d.linearVelocity = direction.normalized * speed;
@@ -120,8 +137,7 @@ public class SpellProjectile : Poolable
         var attacker = ctx.Caster as IAttackable;
         attackLayer = attacker != null ? attacker.AttackLayer : Physics2D.AllLayers;
 
-        // 마나 소진 시 즉시 회수
-        this.mana.OnDepleted += ReturnToPool;
+        this.mana.OnDepleted += OnManaDepleted;
 
         // OnStart 실행
         if (this.projObj != null)
@@ -129,23 +145,66 @@ public class SpellProjectile : Poolable
                 this.ctx, this.mana, new Dictionary<string, object> { ["proj"] = data }));
     }
 
+    // ProjectileNode에서 호출. DSL 라이프사이클 없이 순수 C# 노드로 동작한다.
+    public void InitForNode(
+        SpellNodeContext nodeCtx,
+        Vector2          startPos,
+        Vector2          direction,
+        float            speed,
+        ElementType      element,
+        float            damage)
+    {
+        ctx         = nodeCtx.SpellContext;
+        mana        = nodeCtx.Mana;
+        projObj     = null;
+        Speed       = speed;
+        Element     = element;
+        Damage      = damage;
+        data        = new SpellProjectileData(this);
+        spawnTime   = Time.time;
+        isAlive     = true;
+        hitOccurred = false;
+
+        returnCallback = () => Pool.Instance.Return(PoolKey.SpellProjectile, this);
+
+        Rb2d.position       = startPos;
+        Rb2d.linearVelocity = direction.normalized * speed;
+
+        var attacker = ctx.Caster as IAttackable;
+        attackLayer = attacker != null ? attacker.AttackLayer : Physics2D.AllLayers;
+
+        mana.OnDepleted += OnManaDepleted;
+    }
+
     public override void OnDespawn()
     {
         isAlive = false;
         if (mana != null)
         {
-            mana.OnDepleted -= ReturnToPool;
+            mana.OnDepleted -= OnManaDepleted;
             mana = null;
         }
+        // 구독 누수 방지
+        OnHit    = null;
+        OnExpire = null;
+
         ctx            = null;
         projObj        = null;
         data           = null;
         returnCallback = null;
+        hitOccurred    = false;
         Rb2d.linearVelocity = Vector2.zero;
         base.OnDespawn();
     }
 
     // ─── 내부 헬퍼 ────────────────────────────────────────────
+
+    private void OnManaDepleted()
+    {
+        if (!hitOccurred)
+            OnExpire?.Invoke();
+        ReturnToPool();
+    }
 
     private void ReturnToPool()
     {

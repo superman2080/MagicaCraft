@@ -6,12 +6,12 @@ using TMPro;
 using UnityEngine.UI;
 
 [Serializable]
-public struct DialogData
+public class DialogData
 {
     public float printTime;
     public string name;
     [TextArea(3, 10)] public string script;
-    [Range(0, 1)] public float skipProgress;
+    [Range(0, 1)] public float skipProgress = 0.75f;
 }
 
 public class DialogUI : SubUIManager
@@ -67,7 +67,7 @@ public class DialogUI : SubUIManager
 
     private void NextDialog()
     {
-        if (nowData.skipProgress > progress)
+        if (nowData?.skipProgress > progress)
             return;
 
         if (dialogCor != null)
@@ -112,7 +112,6 @@ public class DialogUI : SubUIManager
                 }
             }
             dialogScript.text += data.script[i];
-            //Debug.Log($"{data.script.Length}, {dialogScript.text.Length}");
             float nowScriptLength = CountVisibleChars(dialogScript.text);
             progress = nowScriptLength / (float)visibleCount;
             yield return waitTime;
