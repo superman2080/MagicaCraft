@@ -10,14 +10,14 @@ using UnityEngine;
 //   2. 생성자에서 SubStateMachine에 자식 상태들을 등록한다.
 //   3. SetInitialState로 초기 자식 상태를 지정한다.
 //   4. 공통 로직은 Execute 등을 override하고 base.Execute()를 반드시 호출한다.
-public abstract class CompositeStateBase : StateBase
+public abstract class CompositeStateBase<T> : StateBase<T> where T : class
 {
     // 자식 상태들을 관리하는 서브 스테이트 머신
-    public EntityStateMachine SubStateMachine { get; protected set; }
+    public StateMachine<T> SubStateMachine { get; protected set; }
 
-    public CompositeStateBase(Entity caster): base(caster)
+    public CompositeStateBase(T caster): base(caster)
     {
-        SubStateMachine = new EntityStateMachine(caster);
+        SubStateMachine = new StateMachine<T>(caster);
     }
 
     // 진입: 부모 로직 실행 후 서브 머신의 초기 자식 상태 Enter 호출

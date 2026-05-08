@@ -20,7 +20,7 @@ public class Fear : StatusEffect
 }
 
 
-public class FearState : StateBase
+public class FearState : StateBase<Entity>
 {
     private Entity fearCaster;
     private Vector2 direction;

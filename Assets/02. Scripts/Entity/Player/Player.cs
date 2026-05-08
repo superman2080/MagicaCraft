@@ -5,6 +5,8 @@ using UnityEngine;
 
 namespace PlayerNamespace
 {
+
+    #region PlayerStates
     public enum PlayerState
     {
         Idle,
@@ -19,7 +21,7 @@ namespace PlayerNamespace
         Jump
     }
 
-    public class PlayerIdle : StateBase
+    public class PlayerIdle : StateBase<Entity>
     {
         private Player player;
         public PlayerIdle(Player caster) : base(caster)
@@ -30,7 +32,6 @@ namespace PlayerNamespace
         public override void Enter()
         {
             base.Enter();
-            player.Animator?.SetBool("1_Move", false);
         }
 
         public override void FixedExecute()
@@ -42,7 +43,7 @@ namespace PlayerNamespace
         }
     }
 
-    public class PlayerCompositeMove : CompositeStateBase
+    public class PlayerCompositeMove : CompositeStateBase<Entity>
     {
         private Player player;
         private PlayerDash dashState;
@@ -74,18 +75,12 @@ namespace PlayerNamespace
                 SubStateMachine.ChangeState(PlayerMoveState.Walk);
         }
 
-        public class PlayerWalk : StateBase
+        public class PlayerWalk : StateBase<Entity>
         {
             private Player player;
             public PlayerWalk(Player caster) : base(caster)
             {
                 player = caster;
-            }
-
-            public override void Enter()
-            {
-                base.Enter();
-                player.Animator?.SetBool("1_Move", true);
             }
 
             public override void FixedExecute()
@@ -96,17 +91,6 @@ namespace PlayerNamespace
                 Vector2 vel = caster.Rb2d.linearVelocity;
                 vel.x = player.InputHandler.MoveInput.x * moveSpeed;
                 caster.Rb2d.linearVelocity = vel;
-
-                if (player.InputHandler.MoveInput.x != 0f)
-                {
-                    player.FacingDirection = Mathf.Sign(player.InputHandler.MoveInput.x);
-                    if (player.Animator != null)
-                    {
-                        var scale = player.Animator.transform.localScale;
-                        scale.x = Mathf.Abs(scale.x) * -player.FacingDirection;
-                        player.Animator.transform.localScale = scale;
-                    }
-                }
             }
         }
 
@@ -119,7 +103,7 @@ namespace PlayerNamespace
             public float baseSpeed;
         }
 
-        public class PlayerDash : StateBase
+        public class PlayerDash : StateBase<Entity>
         {
             public Coroutine dashCor;
             private Player player;
@@ -179,7 +163,7 @@ namespace PlayerNamespace
             }
         }
 
-        public class PlayerJump : StateBase
+        public class PlayerJump : StateBase<Entity>
         {
             private Player player;
 
@@ -196,32 +180,25 @@ namespace PlayerNamespace
         }
     }
 
-    public class PlayerDeath : StateBase
+    public class PlayerDeath : StateBase<Entity>
     {
         private Player player;
         public PlayerDeath(Player caster) : base(caster)
         {
             player = caster;
         }
-
-        public override void Enter()
-        {
-            base.Enter();
-            player.Animator?.SetTrigger("4_Death");
-            player.Animator?.SetBool("isDeath", true);
-        }
     }
+    #endregion
 
     [RequireComponent(typeof(PlayerInputHandler))]
-    public class Player : Entity, IAttackable, IMovable
+    public class Player : Entity, IAttackable, IMovable, IBarriorUsable
     {
-        public Animator Animator { get; private set; }
-
         public override Enum EntryStateKey => entryStateKey;
         [SerializeField] private PlayerState entryStateKey;
 
         public PlayerInputHandler InputHandler { get; private set; }
 
+        public event OnAttackHandler OnAttack;
 
         #region Stat & StatDatas
         public AttackStat AttackStat => attackStat;
@@ -243,10 +220,18 @@ namespace PlayerNamespace
 
         #endregion
 
+        #region Barrior
+        public Barrior Barrior => barrior;
+        private Barrior barrior;
+
+        #endregion
+
+
         public LayerMask AttackLayer => 1 << LayerMask.NameToLayer("Enemy") | LayerMask.NameToLayer("Entity");
 
         private int groundContactCount = 0;
         public bool IsGrounded => groundContactCount > 0;
+
 
         private void OnCollisionEnter2D(Collision2D col)
         {
@@ -263,14 +248,6 @@ namespace PlayerNamespace
         protected override void Start()
         {
             InputHandler = GetComponent<PlayerInputHandler>();
-            foreach (var anim in GetComponentsInChildren<Animator>())
-            {
-                if (anim.runtimeAnimatorController != null)
-                {
-                    Animator = anim;
-                    break;
-                }
-            }
             base.Start();
             moveStat = new MoveStat(moveStatData);
         }
@@ -279,6 +256,7 @@ namespace PlayerNamespace
         {
             base.LateUpdate();
             moveStat.Update();
+            barrior.Update();
         }
 
         protected override void InitializeStateMachine()
@@ -295,14 +273,25 @@ namespace PlayerNamespace
 
         public override void TakeDamage(IAttackable caster, float amount, ElementType element = ElementType.None)
         {
-            base.TakeDamage(caster, amount, element);
-            if (HP > 0f)
-                Animator?.SetTrigger("3_Damaged");
+
+
+            if(barrior.ExistBarrior())
+            {
+                float multiplier = GetDamageMultiplier(element);
+                float finalAmount = Mathf.Abs(amount) * multiplier;
+                barrior.TakeDamage(finalAmount, out float remain);
+                base.TakeDamage(caster, remain, element);
+            }
+            else
+                base.TakeDamage(caster, amount, element);
         }
 
         public void Attack(IDamagable target, float amount)
         {
+            OnAttack?.Invoke(this, target, amount);
             throw new NotImplementedException();
         }
+
+
     }
 }

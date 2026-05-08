@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using UnityEngine;
 
 public enum AttackStatType
@@ -273,7 +274,6 @@ public class HealthStat : Stat<HealthStatType>
 [Serializable]
 public class MoveStat : Stat<MoveStatType>
 {
-
     public MoveStat(StatData<MoveStatType> statData) : base(statData)
     {
     }

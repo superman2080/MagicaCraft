@@ -1,3 +1,4 @@
+using PlayerNamespace;
 using System;
 using System.Collections.Generic;
 using UnityEngine;
@@ -8,34 +9,46 @@ using UnityEngine;
 // - 조건 기반 자동 전환 (RegisterCondition) 과 AnyState 전환을 지원한다.
 // - HFSM에서 CompositeStateBase가 서브 머신으로 사용할 수 있도록 Enter/Exit/SetInitialState를 제공한다.
 
-public class EntityStateMachine
+public class EntityStateMachine : StateMachine<Entity>
+{
+    public EntityStateMachine(Entity caster) : base(caster)
+    {
+    }
+
+    public EntityStateMachine(Entity caster, StateBase<Entity> state) : base(caster, state)
+    {
+
+    }
+}
+
+public class StateMachine<T> where T : class
 {
     // 현재 활성 상태
-    public StateBase CurState { get => state; }
+    public StateBase<T> CurState { get => state; }
 
     // 상태 전환 시 발생하는 이벤트 (이전 상태, 다음 상태)
-    public event Action<StateBase, StateBase> OnStateChanged;
+    public event Action<StateBase<T>, StateBase<T>> OnStateChanged;
 
-    private StateBase state;
-    private Entity caster;
+    private StateBase<T> state;
+    private T caster;
 
     // Enum 키로 상태 인스턴스를 조회하는 딕셔너리
-    private Dictionary<Enum, StateBase> stateDict = new();
+    private Dictionary<Enum, StateBase<T>> stateDict = new();
 
     // 특정 상태에서 다음 상태로의 조건부 전환 목록
-    private Dictionary<StateBase, List<(Func<bool> condition, StateBase next)>> transitionDict = new();
+    private Dictionary<StateBase<T>, List<(Func<bool> condition, StateBase<T> next)>> transitionDict = new();
 
     // 현재 상태에 관계없이 조건이 충족되면 전환되는 AnyState 전환 목록
-    private List<(Func<bool> condition, StateBase next)> anyStateTransitions = new();
+    private List<(Func<bool> condition, StateBase<T> next)> anyStateTransitions = new();
 
     // 초기 상태 없이 생성 (나중에 SetInitialState 또는 ChangeState로 진입)
-    public EntityStateMachine(Entity caster)
+    public StateMachine(T caster)
     {
         this.caster = caster;
     }
 
     // 초기 상태와 함께 생성 (생성 즉시 Enter 호출)
-    public EntityStateMachine(Entity caster, StateBase state)
+    public StateMachine(T caster, StateBase<T> state)
     {
         this.caster = caster;
         this.state = state;
@@ -43,7 +56,7 @@ public class EntityStateMachine
     }
 
     // 현재 상태를 종료하고 새 상태로 즉시 전환 (인스턴스 직접 지정)
-    public void ChangeState(StateBase newState)
+    public void ChangeState(StateBase<T> newState)
     {
         if (newState == null) return;
 
@@ -100,7 +113,7 @@ public class EntityStateMachine
     #region State Registration
 
     // 상태를 Enum 키와 함께 등록
-    public void RegisterState(Enum type, StateBase state)
+    public void RegisterState(Enum type, StateBase<T> state)
     {
         stateDict[type] = state;
     }
@@ -112,7 +125,7 @@ public class EntityStateMachine
     }
 
     // Enum 키로 등록된 상태 인스턴스 반환 (없으면 null)
-    public StateBase GetState(Enum type)
+    public StateBase<T> GetState(Enum type)
     {
         return stateDict.TryGetValue(type, out var state) ? state : null;
     }
@@ -122,29 +135,31 @@ public class EntityStateMachine
     #region State Comparison
 
     // 두 상태가 같은 타입인지 비교
-    public bool CompareState(StateBase s1, StateBase s2)
+    public bool CompareState(StateBase<T> s1, StateBase<T> s2)
     {
         if (s1 == null || s2 == null) return false;
         return s1.GetType() == s2.GetType();
     }
 
     // 상태의 타입 이름이 문자열과 일치하는지 비교
-    public bool CompareState(StateBase s1, string s2)
+    public bool CompareState(StateBase<T> s1, string s2)
     {
         return s1 != null && s2 != null && s1.GetType().Name.Equals(s2);
     }
+
+    public bool CompareState(StateBase<T> s1, Enum e) => s1.GetType() == stateDict[e].GetType();
 
     #endregion
 
     #region Transition Conditions
 
     // 특정 상태(from)에서 특정 상태(to)로의 조건부 전환 등록 (인스턴스 직접 지정)
-    public void RegisterCondition(StateBase from, StateBase to, Func<bool> condition)
+    public void RegisterCondition(StateBase<T> from, StateBase<T> to, Func<bool> condition)
     {
         if (from == null || to == null || condition == null) return;
 
         if (!transitionDict.ContainsKey(from))
-            transitionDict[from] = new List<(Func<bool>, StateBase)>();
+            transitionDict[from] = new List<(Func<bool>, StateBase<T>)>();
 
         transitionDict[from].Add((condition, to));
     }
@@ -155,13 +170,13 @@ public class EntityStateMachine
         RegisterCondition(GetState(from), GetState(to), condition);
     }
 
-    public void RegisterCondition(Enum from, StateBase to, Func<bool> condition)
+    public void RegisterCondition(Enum from, StateBase<T> to, Func<bool> condition)
     {
         RegisterCondition(GetState(from), to, condition);
     }
 
     // 특정 from → to 전환 조건 제거 (인스턴스 직접 지정)
-    public void UnregisterCondition(StateBase from, StateBase to)
+    public void UnregisterCondition(StateBase<T> from, StateBase<T> to)
     {
         if (from == null || to == null) return;
 
@@ -180,7 +195,7 @@ public class EntityStateMachine
     #region Any State Transitions
 
     // 현재 상태와 무관하게 조건 충족 시 전환되는 AnyState 전환 등록 (인스턴스 직접 지정)
-    public void RegisterAnyStateTransition(StateBase to, Func<bool> condition)
+    public void RegisterAnyStateTransition(StateBase<T> to, Func<bool> condition)
     {
         if (to == null || condition == null) return;
 
@@ -194,7 +209,7 @@ public class EntityStateMachine
     }
 
     // 특정 목적지로의 AnyState 전환 제거 (인스턴스 직접 지정)
-    public void UnregisterAnyStateTransition(StateBase to)
+    public void UnregisterAnyStateTransition(StateBase<T> to)
     {
         if (to == null) return;
 

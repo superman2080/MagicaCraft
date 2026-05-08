@@ -18,7 +18,7 @@ public class Stun : StatusEffect
     public override void Exit(Entity target) { }
 }
 
-public class StunState : StateBase
+public class StunState : StateBase<Entity>
 {
     private Entity fearCaster;
     private Vector2 direction;

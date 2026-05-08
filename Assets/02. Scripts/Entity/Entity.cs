@@ -20,7 +20,7 @@ public delegate void OnConcentrationEnterEventHandler(Entity entity);
 public delegate void OnConcentrationExecuteEventHandler(Entity entity);
 public delegate void OnConcentrationExitEventHandler(Entity entity);
 
-public class Concentration: StateBase
+public class Concentration: StateBase<Entity>
 {
     public OnConcentrationEnterEventHandler OnConcentrationEnter;
     public OnConcentrationExecuteEventHandler OnConcentrationExecute;
@@ -53,7 +53,7 @@ public class Concentration: StateBase
 //   1. HardCCStates에 서브 상태 열거값 추가
 //   2. effectToState 딕셔너리에 (StatusEffect 타입, 열거값) 매핑 추가
 //   3. 생성자에서 SubStateMachine.RegisterState() 호출
-public class HardCCState : CompositeStateBase
+public class HardCCState : CompositeStateBase<Entity>
 {
     // StatusEffect 구체 타입 → HardCCStates 서브 상태 키 매핑
     private static readonly Dictionary<Type, HardCCStates> effectToState = new()
