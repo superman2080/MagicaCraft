@@ -58,4 +58,11 @@ public abstract class SpellAction : SpellItem
         throw new RuntimeException(
             $"{sig}: SpellObject가 필요합니다. SpellLibrary에 등록 후 사용하세요.");
     }
+
+    protected IBarriorUsable RequireBarriorUsable(object val, string sig)
+    {
+        if (val is  IBarriorUsable barrior) return barrior;
+        throw new RuntimeException(
+            $"{sig}: BarriorUsable이 필요합니다.");
+    }
 }

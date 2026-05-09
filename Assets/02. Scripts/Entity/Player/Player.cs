@@ -222,7 +222,7 @@ namespace PlayerNamespace
 
         #region Barrior
         public Barrior Barrior => barrior;
-        private Barrior barrior;
+        private Barrior barrior = new Barrior();
 
         #endregion
 

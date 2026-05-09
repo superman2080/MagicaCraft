@@ -1,78 +1,122 @@
-# Research: UIManager 설계
+# Research — DSL 실행 UI (SubUIManager 기반)
 
 ## 목표
 
-인게임 UI 전체를 총괄하는 싱글톤 `UIManager`와,
-각 레이어별 UI를 담당하는 `SubUIManager` 계층 구조 설계.
+플레이어가 인게임에서 DSL 코드를 작성하고 실행할 수 있는 UI 개발.
+기존 `SpellDebugUI`(MonoBehaviour 단독)를 참고하되, `SubUIManager`를 상속해 `UIManager`에 등록되는 정식 UI 레이어로 구현.
 
 ---
 
-## 기존 코드 분석
+## 분석한 파일 목록
 
-### Singleton<T> — `Utils/Singleton.cs`
+| 파일 | 역할 |
+|---|---|
+| `UI/SubUIManager.cs` | 추상 기반. `SortingOrder`, `Show()`, `Hide()`, `UIManager.Register` 자동 등록 |
+| `UI/UIManager.cs` | Singleton 레이어 레지스트리. `Get<T>()` / `TryGet<T>()` |
+| `UI/Layers/DialogUI.cs` | SubUIManager 구현 참고 사례. Inspector 직접 연결 패턴 |
+| `Debug/SpellDebugUI.cs` | DSL 실행 로직 전체 구현. 절차적 UI 생성 방식 |
+| `SpellLanguage/Runtime/SpellContext.cs` | 실행 컨텍스트. Caster 필수, Target 선택 |
+| `SpellLanguage/Library/SpellLibrary.cs` | `CreateDefault()` → 티어 0 해금, `ApplyToContext(ctx)` |
+| `SpellLanguage/Interpreter/ManaTracker.cs` | `Resource` 래핑, `OutOfManaException` |
+| `SpellLanguage/Core/Lexer.cs`, `Parser.cs` | 토크나이징 → AST |
+| `SpellLanguage/Interpreter/Interpreter.cs` | `Run(program)` |
+
+---
+
+## 현재 구조 파악
+
+### SubUIManager 패턴
 
 ```csharp
-public class Singleton<T> : MonoBehaviour where T : MonoBehaviour
+public abstract class SubUIManager : MonoBehaviour
 {
-    private static T instance;
-    public static T Instance { get; }   // 없으면 자동 생성
-    protected virtual void Awake()      // dontDestroy 처리
+    public abstract int SortingOrder { get; }
+    public Canvas Canvas { get; private set; }
+    public bool IsVisible => gameObject.activeSelf;
+
+    protected virtual void Awake() { Canvas = GetComponent<Canvas>(); Canvas.sortingOrder = SortingOrder; }
+    protected virtual void Start()  { UIManager.Instance.Register(this); }
+
+    public void Show() => gameObject.SetActive(true);
+    public void Hide() => gameObject.SetActive(false);
 }
 ```
-- `UIManager : Singleton<UIManager>` 패턴으로 바로 적용 가능.
-- `dontDestroy`는 `readonly bool` — 서브클래스에서 생성자 override 불가. 필요 시 `Awake`에서 직접 처리.
 
-### TimerManager — `Utils/TimerManager.cs`
-- `Singleton<TimerManager>` 상속의 실제 구현 예시.
-- 자체 `private List` 보유, 의존 객체들은 외부에서 주입.
+### DialogUI 패턴 (SubUIManager 구현 선례)
 
-### `Assets/02. Scripts/UI/` 폴더
-- 현재 비어 있음 — 신규 구현.
+- Prefab 기반: Inspector에서 자식 오브젝트 참조 (`[SerializeField]`)
+- `Reset()` 으로 자동 참조 설정
+- `override int SortingOrder => sortingOrder;` + `[SerializeField] private int sortingOrder;`
+- `base.Awake()` 호출 필수
 
----
+### SpellDebugUI DSL 실행 흐름 (재사용 가능한 부분)
 
-## Unity UI 레이어링 방식
-
-Unity에서 UI 레이어 우선순위는 **Canvas의 `sortingOrder`** 로 제어한다.
-- `ScreenSpaceOverlay` Canvas는 `sortingOrder` 높을수록 앞에 렌더링.
-- 각 레이어마다 Canvas GameObject를 분리하면 레이어 단위 Show/Hide 가능.
-
----
-
-## 제안 레이어 구조
-
-| 레이어 클래스 | sortingOrder | 용도 |
-|---|---|---|
-| `BackgroundLayer` | 0 | 배경 패널, 월드 UI |
-| `HUDLayer` | 100 | HP바, 마나바, 스킬 버튼 |
-| `MenuLayer` | 200 | 인벤토리, 스킬트리, 설정 |
-| `PopupLayer` | 300 | 확인 다이얼로그, 툴팁 |
-| `OverlayLayer` | 400 | 로딩화면, 페이드, 알림 |
-
----
-
-## 의존성 및 영향 범위
-
-- 신규 파일만 생성. 기존 코드 변경 없음.
-- `SpellDebugUI.cs`는 별도 Canvas를 직접 생성하므로 UIManager와 무관하게 유지.
-- `Singleton<T>` 그대로 활용.
-
----
-
-## 핵심 설계 결정
-
-### SubUIManager — abstract MonoBehaviour
-- 각 레이어 Canvas를 소유
-- `Show()` / `Hide()` / `IsVisible` 공통 인터페이스 제공
-- 구체 타입에서 레이어별 UI 요소를 추가로 정의
-
-### UIManager
-- 각 레이어를 **명명된 프로퍼티**로 노출 (`UIManager.Instance.HUD`, `.Popup` 등)
-- `Awake`에서 레이어 GameObject를 자식으로 생성하고 SubUIManager 컴포넌트를 추가
-- 정렬 순서는 `UILayerOrder` 상수 클래스로 중앙 관리
-
-### 레이어 생성 헬퍼
 ```csharp
-private T CreateLayer<T>(int sortingOrder) where T : SubUIManager
+var tokens  = new Lexer(code).Tokenize();
+var program = new Parser(tokens).Parse();
+var ctx     = new SpellContext(caster, target);
+var lib     = SpellLibrary.CreateDefault();
+lib.UnlockTier(1);
+lib.ApplyToContext(ctx);
+var manaResource = new Resource(maxMana, 0f);
+var manaTracker  = new ManaTracker(manaResource);
+var interp       = new Interpreter(ctx, manaTracker);
+interp.Run(program);
 ```
-Canvas + CanvasScaler + GraphicRaycaster를 자동으로 추가해 보일러플레이트 제거.
+
+예외 처리: `OutOfManaException`, `RuntimeException`, `Exception`
+
+---
+
+## 영향 분석
+
+- 신규 파일: `Assets/02. Scripts/UI/Layers/SpellEditorUI.cs`
+- 수정 없음: SubUIManager, UIManager, SpellDebugUI (별도 공존)
+- 씬에 새 Canvas GameObject + `SpellEditorUI` 컴포넌트 추가 필요 (MCP로 Prefab 구성)
+
+---
+
+## 기존 패턴 vs 새 UI 차이점
+
+| 항목 | SpellDebugUI | SpellEditorUI (신규) |
+|---|---|---|
+| 기반 클래스 | MonoBehaviour | SubUIManager |
+| UIManager 등록 | 없음 | 자동 (Start에서) |
+| UI 구성 방식 | 절차적 (코드에서 생성) | Prefab + Inspector 연결 |
+| 토글 방식 | 백쿼트 키 | `Show()` / `Hide()` (외부에서 제어) |
+| Canvas | 코드에서 생성 | Prefab의 Canvas 컴포넌트 |
+| Entity 연결 | Inspector SerializeField | Inspector SerializeField |
+
+---
+
+## UI 구성 요소 (필요 목록)
+
+```
+Canvas (SpellEditorUI 컴포넌트, sortingOrder = 200)
+└── Panel (배경 이미지)
+    ├── Header (타이틀 TextMeshProUGUI)
+    ├── ContextBar (HorizontalLayoutGroup)
+    │   ├── CasterLabel (TextMeshProUGUI)
+    │   ├── TargetLabel (TextMeshProUGUI)
+    │   └── ManaLabel  (TextMeshProUGUI)
+    ├── CodeInput (TMP_InputField — 다중 행)
+    ├── ButtonBar (HorizontalLayoutGroup)
+    │   ├── RunButton   (Button)
+    │   ├── ClearButton (Button)
+    │   └── CloseButton (Button)
+    └── LogScroll (ScrollRect)
+        └── Viewport → Content → LogText (TextMeshProUGUI)
+```
+
+---
+
+## 주의사항
+
+1. `base.Awake()` 호출 — Canvas 참조 및 sortingOrder 설정
+2. `base.Start()` 호출 — UIManager 자동 등록
+3. Prefab 방식이므로 UI 요소는 Inspector에서 연결 (`[SerializeField]`)
+4. `Reset()` 메서드로 자식 참조 자동 설정 패턴 유지 (DialogUI 선례)
+5. 마나는 실행마다 초기화 (SpellDebugUI 동일)
+6. `Print(value)` 디버그 명령어 포함
+7. `SubUIManager.Awake()` 가 `GetComponent<Canvas>()` 를 호출하므로,
+   해당 GameObject에 Canvas 컴포넌트가 반드시 있어야 함

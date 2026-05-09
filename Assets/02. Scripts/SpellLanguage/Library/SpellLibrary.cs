@@ -65,7 +65,7 @@ public class SpellLibrary
 
         // 티어 1 액션
         lib.Register(new ExplodeAction { Tier = 1 });
-        lib.Register(new ShieldAction  { Tier = 1 });
+        lib.Register(new BarriorAction  { Tier = 1 });
 
         // 기본 투사체
         lib.Register(new ProjectileObject
