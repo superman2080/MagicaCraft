@@ -9,18 +9,6 @@ using UnityEngine;
 // - 조건 기반 자동 전환 (RegisterCondition) 과 AnyState 전환을 지원한다.
 // - HFSM에서 CompositeStateBase가 서브 머신으로 사용할 수 있도록 Enter/Exit/SetInitialState를 제공한다.
 
-public class EntityStateMachine : StateMachine<Entity>
-{
-    public EntityStateMachine(Entity caster) : base(caster)
-    {
-    }
-
-    public EntityStateMachine(Entity caster, StateBase<Entity> state) : base(caster, state)
-    {
-
-    }
-}
-
 public class StateMachine<T> where T : class
 {
     // 현재 활성 상태
@@ -63,7 +51,7 @@ public class StateMachine<T> where T : class
         var prevState = state;
         state?.Exit();
         state = newState;
-        state.Enter();
+        state?.Enter();
 
         OnStateChanged?.Invoke(prevState, state);
     }
@@ -147,7 +135,7 @@ public class StateMachine<T> where T : class
         return s1 != null && s2 != null && s1.GetType().Name.Equals(s2);
     }
 
-    public bool CompareState(StateBase<T> s1, Enum e) => s1.GetType() == stateDict[e].GetType();
+    public bool CompareState(StateBase<T> s1, Enum e) => s1 == stateDict[e];
 
     #endregion
 

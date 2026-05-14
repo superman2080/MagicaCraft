@@ -104,7 +104,7 @@ public class PlayerManager : MonoBehaviour
                 var Button = Instantiate(AnimationButton, ParentTranform);
                 Button.GetComponentInChildren<Text>().text = clip.name;
                 Button.onClick.AddListener(()=> {
-                    if(Enum.TryParse(StateName, true, out PlayerState State))
+                    if(Enum.TryParse(StateName, true, out SPUMPlayerState State))
                     {
                         Unit.isAction = true;
                         int index = Info[StateName].FindIndex(x => x == clip);

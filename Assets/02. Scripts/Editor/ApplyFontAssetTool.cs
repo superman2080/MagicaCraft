@@ -1,6 +1,7 @@
 using UnityEditor;
 using UnityEngine;
 using TMPro;
+using System.Linq;
 
 public class ApplyFontAssetTool: EditorWindow
 {
@@ -13,11 +14,11 @@ public class ApplyFontAssetTool: EditorWindow
             "Texture", targetTexture, typeof(Texture2D), allowSceneObjects: false)
         */
 
-        fontAsset = EditorGUILayout.ObjectField("asd", fontAsset, typeof(TMP_FontAsset), allowSceneObjects: false) as TMP_FontAsset;
+        fontAsset = EditorGUILayout.ObjectField("Apply Font", fontAsset, typeof(TMP_FontAsset), allowSceneObjects: false) as TMP_FontAsset;
         if (GUILayout.Button("Apply"))
         {
-            var fonts = FindSceneObjectsOfType(typeof(TMP_FontAsset));
-
+            var fonts = FindObjectsByType<TextMeshProUGUI>(FindObjectsSortMode.None);
+            fonts.ToList().ForEach(f => f.font = fontAsset);
         }
     }
 

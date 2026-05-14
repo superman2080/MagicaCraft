@@ -115,8 +115,8 @@ public abstract class Entity : MonoBehaviour, IDamagable
     public Collider2D Col { get; private set; }
 
     public abstract Enum EntryStateKey { get; }
-    public EntityStateMachine StateMachine => stateMachine;
-    protected EntityStateMachine stateMachine;
+    public StateMachine<Entity> StateMachine => stateMachine;
+    protected StateMachine<Entity> stateMachine;
 
     public HealthStat HealthStat => healthStat;
     private HealthStat healthStat;
@@ -181,7 +181,7 @@ public abstract class Entity : MonoBehaviour, IDamagable
         statusEffectHandler = new StatusEffectHandler(this);
 
         #region StateMachine
-        stateMachine = new EntityStateMachine(this);
+        stateMachine = new StateMachine<Entity>(this);
         InitializeStateMachine();
         if (EntryStateKey != null)
             stateMachine.ChangeState(EntryStateKey);
@@ -197,8 +197,8 @@ public abstract class Entity : MonoBehaviour, IDamagable
 
     protected virtual void LateUpdate()
     {
-        statusEffectHandler.UpdateEffect();
-        healthStat.Update();
+        statusEffectHandler?.UpdateEffect();
+        healthStat?.Update();
     }
 
     // 물리 연산용 상태 업데이트

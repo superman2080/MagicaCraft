@@ -1,3 +1,4 @@
+using System;
 using UnityEngine;
 using UnityEngine.InputSystem;
 
@@ -5,7 +6,10 @@ public class PlayerInputHandler : MonoBehaviour
 {
     private PlayerInput playerInput;
     public Vector2 MousePos { get; private set; }
+    public Action<Vector2> OnMousePosChanged { get; set; }
+
     public Vector2 MoveInput { get; private set; }
+    public Action<Vector2> OnMoveInputChanged { get; set; }
 
     public bool LeftMouseButtonPressed { get; private set; }
     public bool RightMouseButtonPressed { get; private set; }
@@ -21,7 +25,11 @@ public class PlayerInputHandler : MonoBehaviour
 
         playerInput.Player.MousePos.performed += ctx => MousePos = ctx.ReadValue<Vector2>();
 
-        playerInput.Player.Move.performed += ctx => MoveInput = ctx.ReadValue<Vector2>();
+        playerInput.Player.Move.performed += (ctx) => { 
+            OnMoveInputChanged?.Invoke(ctx.ReadValue<Vector2>());
+            MoveInput = ctx.ReadValue<Vector2>(); 
+        };
+        
         playerInput.Player.Move.canceled += ctx => MoveInput = Vector2.zero;
 
         playerInput.Player.LeftButton.performed += ctx => LeftMouseButtonPressed = true;

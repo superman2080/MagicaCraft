@@ -91,6 +91,9 @@ namespace PlayerNamespace
                 Vector2 vel = caster.Rb2d.linearVelocity;
                 vel.x = player.InputHandler.MoveInput.x * moveSpeed;
                 caster.Rb2d.linearVelocity = vel;
+
+                if (player.InputHandler.MoveInput.x != 0f)
+                    player.FacingDirection = Mathf.Sign(player.InputHandler.MoveInput.x);
             }
         }
 
@@ -190,6 +193,7 @@ namespace PlayerNamespace
     }
     #endregion
 
+    [DefaultExecutionOrder(0)]
     [RequireComponent(typeof(PlayerInputHandler))]
     public class Player : Entity, IAttackable, IMovable, IBarriorUsable
     {
@@ -216,7 +220,7 @@ namespace PlayerNamespace
         [SerializeField] private PlayerCompositeMove.DashConfig dashConfig;
         public PlayerCompositeMove.DashConfig DashConfig => dashConfig;
 
-        public float FacingDirection { get; set; } = 1f;
+        public float FacingDirection { get; set; } = -1f;
 
         #endregion
 

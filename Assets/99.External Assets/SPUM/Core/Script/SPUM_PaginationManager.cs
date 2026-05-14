@@ -171,7 +171,7 @@ public partial class SPUM_PaginationManager : MonoBehaviour
             {
                 try
                 {
-                    PreviewData.PlayAnimation(PlayerState.IDLE, 0);
+                    PreviewData.PlayAnimation(SPUMPlayerState.IDLE, 0);
                 }
                 catch (System.ArgumentOutOfRangeException)
                 {

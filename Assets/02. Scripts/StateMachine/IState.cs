@@ -5,6 +5,7 @@ using UnityEngine;
 
 public interface IState
 {
+
     // 상태 진입 시 1회 호출
     void Enter();
 
