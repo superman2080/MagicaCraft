@@ -2,7 +2,7 @@ using System.Collections.Generic;
 using UnityEngine;
 using System.Linq;
 
-public interface IBarriorUsable
+public interface IBarriorUser
 {
     Barrior Barrior { get; }
 }

@@ -38,7 +38,7 @@ public class FearState : StateBase<Entity>
     {
         base.Execute();
         // Stat<T>.InitStat()이 매 LateUpdate에서 배율을 1로 초기화하므로 매 프레임 재적용한다.
-        (caster as IMovable)?.MoveStat.Multiply(MoveStatType.MOVE_SPEED, 0.5f);
+        (caster as IMovable)?.MoveStat.Multiply(MoveStatType.MoveSpeed, 0.5f);
     }
 
     public override void FixedExecute()

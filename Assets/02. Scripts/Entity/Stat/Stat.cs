@@ -5,27 +5,33 @@ using UnityEngine;
 
 public enum AttackStatType
 {
-    ATTACK_SPEED,
-    DAMAGE,
-    ATTACK_DISTANCE,
+    AttackSpeed,
+    Damage,
+    AttackDistance,
 }
 
 public enum HealthStatType
 {
-    MAX_HP,
-    HP_REGEN,
+    MaxHP,
+    HPRegen,
 }
 
 public enum MoveStatType
 {
-    MOVE_SPEED,
-    JUMP_FORCE,
+    MoveSpeed,
+    JumpForce,
+}
+
+public enum ManaStatType
+{
+    MaxMana,
+    ManaRegen,
 }
 
 [Serializable]
 public class Resource
 {
-    [SerializeField] private ClampedFloat source = new ClampedFloat(100f);
+    private ClampedFloat source;
     [SerializeField] private float regenPerSecond;
     [SerializeField, Min(0.01f)] private float regenTick = 0.5f;
     public bool disableRegen = false;
@@ -54,7 +60,7 @@ public class Resource
     public float RegenTick
     {
         get => regenTick;
-        set => regenTick = Mathf.Max(0.01f, value);
+        set => regenTick = Mathf.Max(0, value);
     }
 
     public float Ratio => source.Ratio;
@@ -62,6 +68,7 @@ public class Resource
     public bool IsFull => source.IsFull;
 
     public event Action<float, float> OnValueChanged;
+    public event Action<float, float> OnValueSubtract;
     public event Action OnDepleted;
     public event Action OnFilled;
 
@@ -88,6 +95,7 @@ public class Resource
     private void BindEvents()
     {
         source.OnValueChanged += (current, max) => OnValueChanged?.Invoke(current, max);
+        source.OnValueSubtract += (current, max) => OnValueSubtract?.Invoke(current, max);
         source.OnDepleted += () => OnDepleted?.Invoke();
         source.OnFilled += () => OnFilled?.Invoke();
     }
@@ -241,24 +249,23 @@ public abstract class Stat<T> where T : Enum
     }
 }
 
-
-[Serializable]
 public class HealthStat : Stat<HealthStatType>
 {
-    public Resource HP;
+    public Resource HP => hp;
+    private Resource hp;
 
     public HealthStat(StatData<HealthStatType> statData) : base(statData)
     {
         var dict = statData.StatDict;
-        HP = new Resource(dict[HealthStatType.MAX_HP], dict[HealthStatType.HP_REGEN]);
+        hp = new Resource(dict[HealthStatType.MaxHP], dict[HealthStatType.HPRegen]);
     }
 
     public override void SetDefault(HealthStatType type, float defaultVal)
     {
-        if (type == HealthStatType.MAX_HP)
+        if (type == HealthStatType.MaxHP)
         {
-            float oldMaxHP = defaultStat[HealthStatType.MAX_HP];
-            HP.OnMaxValueChanged(oldMaxHP, defaultVal, keepRatio: true);
+            float oldMaxHP = defaultStat[HealthStatType.MaxHP];
+            hp.OnMaxValueChanged(oldMaxHP, defaultVal, keepRatio: true);
         }
         base.SetDefault(type, defaultVal);
     }
@@ -266,12 +273,10 @@ public class HealthStat : Stat<HealthStatType>
     public override void Update()
     {
         base.Update();
-        HP.Tick(Time.deltaTime);
+        hp.Tick(Time.deltaTime);
     }
 }
 
-
-[Serializable]
 public class MoveStat : Stat<MoveStatType>
 {
     public MoveStat(StatData<MoveStatType> statData) : base(statData)
@@ -279,11 +284,37 @@ public class MoveStat : Stat<MoveStatType>
     }
 }
 
-
-[Serializable]
 public class AttackStat : Stat<AttackStatType>
 {
     public AttackStat(StatData<AttackStatType> statType): base(statType)
     {
+    }
+}
+
+public class ManaStat : Stat<ManaStatType>
+{
+    public Resource Mana => mana;
+    private Resource mana;
+
+    public ManaStat(StatData<ManaStatType> statData) : base(statData)
+    {
+        var dict = statData.StatDict;
+        mana = new Resource(dict[ManaStatType.MaxMana], dict[ManaStatType.ManaRegen]);
+    }
+
+    public override void SetDefault(ManaStatType type, float defaultVal)
+    {
+        if (type == ManaStatType.MaxMana)
+        {
+            float oldMaxHP = defaultStat[ManaStatType.MaxMana];
+            mana.OnMaxValueChanged(oldMaxHP, defaultVal);
+        }
+        base.SetDefault(type, defaultVal);
+    }
+
+    public override void Update()
+    {
+        base.Update();
+        mana.Tick(Time.deltaTime);
     }
 }

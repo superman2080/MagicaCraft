@@ -86,7 +86,7 @@ namespace PlayerNamespace
             public override void FixedExecute()
             {
                 base.FixedExecute();
-                float moveSpeed = player.MoveStat.Get(MoveStatType.MOVE_SPEED);
+                float moveSpeed = player.MoveStat.Get(MoveStatType.MoveSpeed);
 
                 Vector2 vel = caster.Rb2d.linearVelocity;
                 vel.x = player.InputHandler.MoveInput.x * moveSpeed;
@@ -178,7 +178,7 @@ namespace PlayerNamespace
             public override void Enter()
             {
                 base.Enter();
-                caster.Rb2d.AddForce(Vector2.up * player.MoveStat.Get(MoveStatType.JUMP_FORCE), ForceMode2D.Impulse);
+                caster.Rb2d.AddForce(Vector2.up * player.MoveStat.Get(MoveStatType.JumpForce), ForceMode2D.Impulse);
             }
         }
     }
@@ -195,24 +195,26 @@ namespace PlayerNamespace
 
     [DefaultExecutionOrder(0)]
     [RequireComponent(typeof(PlayerInputHandler))]
-    public class Player : Entity, IAttackable, IMovable, IBarriorUsable
+    public class Player : Entity, IAttackable, IMovable, IBarriorUser, IManaUser
     {
-        public override Enum EntryStateKey => entryStateKey;
-        [SerializeField] private PlayerState entryStateKey;
-
         public PlayerInputHandler InputHandler { get; private set; }
 
         public event OnAttackHandler OnAttack;
 
         #region Stat & StatDatas
         public AttackStat AttackStat => attackStat;
-        [SerializeField] private AttackStat attackStat;
+        private AttackStat attackStat;
 
         public AttackStatDataSO AttackStatData => attackStatData;
         [SerializeField] private AttackStatDataSO attackStatData;
 
         public MoveStat MoveStat => moveStat;
         private MoveStat moveStat;
+
+        public ManaStat ManaStat => manaStat;
+        private ManaStat manaStat;
+        public ManaStatDataSO ManaStatData => manaStatData;
+        [SerializeField] ManaStatDataSO manaStatData;
 
         public MoveStatDataSO MoveStatData => moveStatData;
         [SerializeField] private MoveStatDataSO moveStatData;
@@ -229,6 +231,9 @@ namespace PlayerNamespace
         private Barrior barrior = new Barrior();
 
         #endregion
+
+        public override Enum EntryStateKey => entryStateKey;
+        [SerializeField] private PlayerState entryStateKey;
 
 
         public LayerMask AttackLayer => 1 << LayerMask.NameToLayer("Enemy") | LayerMask.NameToLayer("Entity");
@@ -254,13 +259,18 @@ namespace PlayerNamespace
             InputHandler = GetComponent<PlayerInputHandler>();
             base.Start();
             moveStat = new MoveStat(moveStatData);
+            manaStat = new ManaStat(manaStatData);
         }
 
         protected override void LateUpdate()
         {
             base.LateUpdate();
+
+            #region Stat Update
+            manaStat.Update();
             moveStat.Update();
             barrior.Update();
+            #endregion
         }
 
         protected override void InitializeStateMachine()

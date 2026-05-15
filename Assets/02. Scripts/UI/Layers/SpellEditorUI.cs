@@ -2,6 +2,7 @@ using System;
 using System.Text;
 using TMPro;
 using UnityEngine;
+using UnityEngine.InputSystem;
 using UnityEngine.UI;
 
 public class SpellEditorUI : SubUIManager
@@ -33,7 +34,27 @@ public class SpellEditorUI : SubUIManager
     // ─── 내부 상태 ────────────────────────────────────────────
 
     private readonly StringBuilder log = new();
-    private Resource manaResource;
+    private ManaStat manaStat;
+
+    private PlayerInputHandler playerInputHandler;
+    private string prevInputText = "";
+    private bool   isAutoClosing = false;
+
+    // ─────────────────────────────────────────────────────────
+    // Show / Hide
+    // ─────────────────────────────────────────────────────────
+
+    public override void Show()
+    {
+        base.Show();
+        playerInputHandler?.SetInputEnabled(false);
+    }
+
+    public override void Hide()
+    {
+        base.Hide();
+        playerInputHandler?.SetInputEnabled(true);
+    }
 
     // ─────────────────────────────────────────────────────────
     // Unity 생명주기
@@ -42,11 +63,29 @@ public class SpellEditorUI : SubUIManager
     protected override void Awake()
     {
         base.Awake();
+        // Show()가 Start() 이전에 호출될 때를 대비해 여기서 참조 획득
+        playerInputHandler = FindFirstObjectByType<PlayerInputHandler>();
     }
 
     protected override void Start()
     {
         base.Start();
+
+        // Awake에서 못 찾았을 경우 재시도 (플레이어가 늦게 초기화되는 경우)
+        if (playerInputHandler == null)
+            playerInputHandler = FindFirstObjectByType<PlayerInputHandler>();
+
+        // 이미 표시 상태로 시작하면 즉시 차단
+        if (IsVisible)
+            playerInputHandler?.SetInputEnabled(false);
+
+        if (codeInput != null)
+        {
+            codeInput.lineType = TMP_InputField.LineType.MultiLineNewline;
+            codeInput.onValueChanged.AddListener(OnCodeInputChanged);
+            codeInput.onSubmit.AddListener(OnInputSubmit);
+            prevInputText = codeInput.text;
+        }
 
         runButton?.onClick.AddListener(RunCode);
         clearButton?.onClick.AddListener(ClearLog);
@@ -58,11 +97,127 @@ public class SpellEditorUI : SubUIManager
         RefreshLog();
     }
 
-    private void Update()
+    // ─────────────────────────────────────────────────────────
+    // 입력 처리
+    // ─────────────────────────────────────────────────────────
+
+    // InputSystemUIInputModule이 Enter를 Submit으로 가로채므로
+    // Update()가 아닌 onSubmit 콜백에서 처리한다.
+    private void OnInputSubmit(string _)
     {
-        if (!IsVisible) return;
-        if (Input.GetKey(KeyCode.LeftControl) && Input.GetKeyDown(KeyCode.Return))
+        var kb = Keyboard.current;
+        bool ctrlHeld = kb != null && kb.ctrlKey.isPressed;
+
+        if (ctrlHeld)
+        {
             RunCode();
+        }
+        else
+        {
+            int insertPos   = codeInput.stringPosition;
+            int newCaretPos = InsertNewline(insertPos);
+            StartCoroutine(ReactivateInputField(newCaretPos));
+        }
+    }
+
+    private System.Collections.IEnumerator ReactivateInputField(int caretPos)
+    {
+        // DeactivateInputField 대기
+        yield return null;
+        if (IsVisible && codeInput != null)
+        {
+            codeInput.ActivateInputField();
+            // ActivateInputField 초기화 대기 후 선택 해제
+            yield return null;
+            codeInput.stringPosition              = caretPos;
+            codeInput.selectionStringAnchorPosition = caretPos;
+            codeInput.selectionStringFocusPosition  = caretPos;
+        }
+    }
+
+    private int InsertNewline(int pos)
+    {
+        string text = codeInput.text;
+
+        // 현재 줄 들여쓰기 계산
+        int lineStart  = pos > 0 ? text.LastIndexOf('\n', pos - 1) + 1 : 0;
+        string curLine = text.Substring(lineStart, pos - lineStart);
+        string indent  = GetLeadingWhitespace(curLine);
+
+        // 커서가 { } 사이에 있으면 Allman 스타일 확장
+        char before = pos > 0          ? text[pos - 1] : '\0';
+        char after  = pos < text.Length ? text[pos]     : '\0';
+
+        string insertion;
+        int    newCaretPos;
+
+        if (before == '{' && after == '}')
+        {
+            string inner = indent + "    ";
+            insertion   = "\n" + inner + "\n" + indent;
+            newCaretPos = pos + 1 + inner.Length;
+        }
+        else
+        {
+            insertion   = "\n" + indent;
+            newCaretPos = pos + 1 + indent.Length;
+        }
+
+        isAutoClosing      = true;
+        codeInput.text     = text.Insert(pos, insertion);
+        isAutoClosing      = false;
+        prevInputText      = codeInput.text;
+
+        return newCaretPos;
+    }
+
+    private static string GetLeadingWhitespace(string line)
+    {
+        int i = 0;
+        while (i < line.Length && (line[i] == ' ' || line[i] == '\t'))
+            i++;
+        return line.Substring(0, i);
+    }
+
+    // ─────────────────────────────────────────────────────────
+    // 자동 괄호 닫기
+    // ─────────────────────────────────────────────────────────
+
+    private void OnCodeInputChanged(string newText)
+    {
+        if (isAutoClosing) return;
+
+        // 단일 문자 삽입만 처리
+        if (newText.Length != prevInputText.Length + 1)
+        {
+            prevInputText = newText;
+            return;
+        }
+
+        int caretPos = codeInput.stringPosition;
+        if (caretPos <= 0)
+        {
+            prevInputText = newText;
+            return;
+        }
+
+        char inserted = newText[caretPos - 1];
+        char closing;
+
+        if      (inserted == '(') closing = ')';
+        else if (inserted == '{') closing = '}';
+        else
+        {
+            prevInputText = newText;
+            return;
+        }
+
+        isAutoClosing = true;
+        codeInput.text = newText.Insert(caretPos, closing.ToString());
+        codeInput.stringPosition = caretPos;
+        isAutoClosing = false;
+
+        prevInputText = codeInput.text;
     }
 
     // ─────────────────────────────────────────────────────────
@@ -89,8 +244,11 @@ public class SpellEditorUI : SubUIManager
             return;
         }
 
-        manaResource = new Resource(maxMana, 0f);
-        var manaTracker = new ManaTracker(manaResource);
+        var manaData = ScriptableObject.CreateInstance<ManaStatDataSO>();
+        manaData.StatDict[ManaStatType.MaxMana]  = maxMana;
+        manaData.StatDict[ManaStatType.ManaRegen] = 0f;
+        manaStat = new ManaStat(manaData);
+        var manaTracker = new ManaTracker(manaStat);
         UpdateLabels();
 
         AppendLog("<color=#5C6370>──────────────────────────────────────────────────</color>");
@@ -115,12 +273,12 @@ public class SpellEditorUI : SubUIManager
             interp.Run(program);
 
             float ms    = (Time.realtimeSinceStartup - t0) * 1000f;
-            float spent = maxMana - manaResource.CurrentValue;
+            float spent = maxMana - manaStat.Mana.CurrentValue;
 
             AppendLog($"<color=#98C379>✓ 완료</color>  <color=#5C6370>({ms:F1} ms)</color>");
             if (spent > 0.01f)
                 AppendLog($"<color=#C678DD>  마나 소모: {spent:F0}  " +
-                           $"(남음: {manaResource.CurrentValue:F0}/{maxMana})</color>");
+                           $"(남음: {manaStat.Mana.CurrentValue:F0}/{maxMana})</color>");
         }
         catch (OutOfManaException ex)
         {
@@ -158,6 +316,11 @@ public class SpellEditorUI : SubUIManager
     // 로그 유틸
     // ─────────────────────────────────────────────────────────
 
+    public void Log(string message)
+    {
+        AppendLog(message); RefreshLog();
+    }
+
     private void AppendLog(string line) => log.AppendLine(line);
 
     private void ClearLog()
@@ -188,8 +351,8 @@ public class SpellEditorUI : SubUIManager
                 : "<color=#5C6370>Target: (없음)</color>";
 
         if (manaLabel != null)
-            manaLabel.text = manaResource != null
-                ? $"Mana: {manaResource.CurrentValue:F0}/{maxMana:F0}"
+            manaLabel.text = manaStat != null
+                ? $"Mana: {manaStat.Mana.CurrentValue:F0}/{maxMana:F0}"
                 : $"Mana: {maxMana:F0}/{maxMana:F0}";
     }
 

@@ -42,6 +42,12 @@ public class PlayerInputHandler : MonoBehaviour
         playerInput.Player.Jump.performed += ctx => JumpPressed = true;
     }
 
+    public void SetInputEnabled(bool enabled)
+    {
+        if (enabled) playerInput.Enable();
+        else         playerInput.Disable();
+    }
+
     private void OnEnable()
     {
         playerInput.Enable();

@@ -19,6 +19,6 @@ public abstract class SubUIManager : MonoBehaviour
         UIManager.Instance.Register(this);
     }
 
-    public void Show() => gameObject.SetActive(true);
-    public void Hide() => gameObject.SetActive(false);
+    public virtual void Show() => gameObject.SetActive(true);
+    public virtual void Hide() => gameObject.SetActive(false);
 }

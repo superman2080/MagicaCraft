@@ -222,8 +222,12 @@ public class Interpreter
             "hp"        => (double)entity.HP,
             "maxHp"     => (double)entity.HealthStat.HP.MaxValue,
             "hpRatio"   => (double)entity.HealthStat.HP.Ratio,
-            "moveSpeed" => (double?)(entity as IMovable)?.MoveStat.Get(MoveStatType.MOVE_SPEED) ?? 0.0,
+            "moveSpeed" => (double?)(entity as IMovable)?.MoveStat.Get(MoveStatType.MoveSpeed) ?? 0.0,
             "position"  => entity.Rb2d != null ? (object)entity.Rb2d.position : Vector2.zero,
+            "mana"      => (double?)((entity as IManaUser)?.ManaStat.Mana.CurrentValue) ?? 0.0,
+            "maxMana"   => (double?)((entity as IManaUser)?.ManaStat.Mana.MaxValue)     ?? 0.0,
+            "manaRatio" => (double?)((entity as IManaUser)?.ManaStat.Mana.Ratio)        ?? 0.0,
+            "barriorAmount" => (double?)((entity as IBarriorUser)?.Barrior.GetBarriorValue())   ?? 0.0f,
             _ => throw new RuntimeException($"Entity에 '{member}' 필드가 없습니다.", line, col)
         };
     }

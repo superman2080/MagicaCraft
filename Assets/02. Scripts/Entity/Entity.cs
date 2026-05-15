@@ -159,7 +159,7 @@ public abstract class Entity : MonoBehaviour, IDamagable
         float multiplier  = GetDamageMultiplier(element);
         float finalAmount = Mathf.Abs(amount) * multiplier;
 
-        OnTakeDamage?.Invoke(this, caster, finalAmount);
+        OnTakeDamage?.Invoke(this, caster, finalAmount, element);
         healthStat.HP.Subtract(finalAmount);
         if (healthStat.HP.IsEmpty)
         {

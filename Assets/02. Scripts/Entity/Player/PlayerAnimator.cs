@@ -23,7 +23,7 @@ public class PlayerAnimator : MonoBehaviour
         owner ??= gameObject.GetComponent<Player>();
         animator ??= gameObject.GetComponentInChildren<Animator>();
 
-        owner.OnTakeDamage += (s, c, a) => animator.SetTrigger(damageHash);
+        owner.OnTakeDamage += (s, c, a, t) => animator.SetTrigger(damageHash);
         owner.StateMachine.OnStateChanged += (from, to) => {
             if (owner.StateMachine.CompareState(from, PlayerState.Idle) && owner.StateMachine.CompareState(to, PlayerState.Move)) {
                 

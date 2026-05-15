@@ -1,6 +1,6 @@
 using UnityEngine;
 
-public delegate void OnTakeDamageHandler(IDamagable sender, IAttackable caster, float amount);
+public delegate void OnTakeDamageHandler(IDamagable sender, IAttackable caster, float amount, ElementType element);
 public delegate void OnHealHandler(IDamagable sender, IAttackable caster, float amount);
 public delegate void OnDiedHandler(IDamagable sender, IAttackable caster);
 

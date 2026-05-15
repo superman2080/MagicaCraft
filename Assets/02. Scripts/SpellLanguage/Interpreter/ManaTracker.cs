@@ -17,9 +17,9 @@ public class ManaTracker
     // SpellSkill(Continuous): 구독 시 Cancel
     public event Action OnDepleted;
 
-    public ManaTracker(Resource mana)
+    public ManaTracker(ManaStat manaStat)
     {
-        this.mana = mana;
+        this.mana = manaStat.Mana;
         this.mana.OnDepleted += () => OnDepleted?.Invoke();
     }
 

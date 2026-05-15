@@ -39,6 +39,7 @@ public class ClampedFloat
     public bool IsFull => Mathf.Approximately(currentValue, maxValue);
 
     public event Action<float, float> OnValueChanged; // current, max
+    public event Action<float, float> OnValueSubtract;
     public event Action OnDepleted;
     public event Action OnFilled;
 
@@ -59,7 +60,11 @@ public class ClampedFloat
             OnFilled?.Invoke();
     }
 
-    public void Subtract(float amount) => Add(-amount);
+    public void Subtract(float amount)
+    {
+        OnValueSubtract?.Invoke(currentValue, amount);
+        Add(-amount);
+    }
 
     public void SetToMax() => CurrentValue = maxValue;
 

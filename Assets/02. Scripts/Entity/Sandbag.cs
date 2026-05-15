@@ -28,7 +28,7 @@ namespace Sandbag
         public override void FixedExecute()
         {
             base.FixedExecute();
-            Debug.Log("Sandbag is idle at position: " + sandbag.transform.position);
+            caster.Rb2d.linearVelocity = Vector2.zero;
             caster.Rb2d.position = originalPosition;
         }
     }
@@ -43,6 +43,14 @@ namespace Sandbag
         {
             base.InitializeStateMachine();
             stateMachine.RegisterState(SandbagState.Idle, new SandbagIdle(this));
+        }
+
+        protected override void Start()
+        {
+            base.Start();
+            OnTakeDamage += (s, c, amount, type) => { 
+                UIManager.Instance.Get<SpellEditorUI>().Log($"<color=#98C379>피해 받음 / 피해량:{amount}, 타입{type}</color>");
+            };
         }
     }
 }

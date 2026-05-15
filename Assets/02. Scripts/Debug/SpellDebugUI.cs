@@ -58,7 +58,7 @@ public class SpellDebugUI : MonoBehaviour
     private TextMeshProUGUI targetLabel;
 
     private readonly StringBuilder log = new();
-    private Resource   manaResource;
+    private ManaStat   manaStat;
     private bool       isDragging;
     private Vector2    dragOffset;
 
@@ -292,7 +292,7 @@ public class SpellDebugUI : MonoBehaviour
         SetWidth(resetBtn, 100);
         resetBtn.GetComponent<Button>().onClick.AddListener(() =>
         {
-            manaResource?.SetToMax();
+            manaStat?.Mana.SetToMax();
             UpdateManaLabel();
             AppendLog("<color=#61AEEF>  마나 초기화됨.</color>");
             RefreshLog();
@@ -360,7 +360,7 @@ public class SpellDebugUI : MonoBehaviour
         logText.fontSize     = 12;
         logText.color        = ColText;
         logText.richText     = true;
-        logText.enableWordWrapping = false;
+        logText.textWrappingMode = TextWrappingModes.NoWrap;
         logText.overflowMode = TextOverflowModes.Overflow;
     }
 
@@ -389,8 +389,11 @@ public class SpellDebugUI : MonoBehaviour
         }
 
         // 마나 리소스 초기화
-        manaResource = new Resource(maxMana, 0f);
-        var manaTracker = new ManaTracker(manaResource);
+        var manaData = ScriptableObject.CreateInstance<ManaStatDataSO>();
+        manaData.StatDict[ManaStatType.MaxMana]  = maxMana;
+        manaData.StatDict[ManaStatType.ManaRegen] = 0f;
+        manaStat = new ManaStat(manaData);
+        var manaTracker = new ManaTracker(manaStat);
         UpdateManaLabel();
 
         AppendLog($"<color=#5C6370>──────────────────────────────────────────────────</color>");
@@ -421,13 +424,13 @@ public class SpellDebugUI : MonoBehaviour
 
             // ── 결과 ──────────────────────────────────────────
             float ms    = (Time.realtimeSinceStartup - t0) * 1000f;
-            float spent = maxMana - manaResource.CurrentValue;
+            float spent = maxMana - manaStat.Mana.CurrentValue;
 
             AppendLog($"<color=#98C379>✓ 완료</color>  " +
                       $"<color=#5C6370>({ms:F1} ms)</color>");
             if (spent > 0.01f)
                 AppendLog($"<color=#C678DD>  마나 소모: {spent:F0}  " +
-                           $"(남음: {manaResource.CurrentValue:F0}/{maxMana})</color>");
+                           $"(남음: {manaStat.Mana.CurrentValue:F0}/{maxMana})</color>");
         }
         catch (OutOfManaException ex)
         {
@@ -489,9 +492,9 @@ public class SpellDebugUI : MonoBehaviour
 
     private void UpdateManaLabel()
     {
-        if (manaLabel == null || manaResource == null) return;
+        if (manaLabel == null || manaStat == null) return;
         manaLabel.text =
-            $"Mana: {manaResource.CurrentValue:F0}/{maxMana:F0}";
+            $"Mana: {manaStat.Mana.CurrentValue:F0}/{maxMana:F0}";
     }
 
     // ─────────────────────────────────────────────────────────
@@ -567,7 +570,7 @@ public class SpellDebugUI : MonoBehaviour
         phText.text     = placeholder;
         phText.fontSize = 13;
         phText.color    = ColMuted;
-        phText.enableWordWrapping = false;
+        phText.textWrappingMode = TextWrappingModes.NoWrap;
         input.placeholder = phText;
 
         // 실제 텍스트
@@ -580,7 +583,7 @@ public class SpellDebugUI : MonoBehaviour
         var tmpText = txt.AddComponent<TextMeshProUGUI>();
         tmpText.fontSize = 13;
         tmpText.color    = new Color(0.84f, 0.88f, 0.96f);
-        tmpText.enableWordWrapping = false;
+        tmpText.textWrappingMode = TextWrappingModes.NoWrap;
         tmpText.overflowMode      = TextOverflowModes.Overflow;
         input.textComponent = tmpText;
 
