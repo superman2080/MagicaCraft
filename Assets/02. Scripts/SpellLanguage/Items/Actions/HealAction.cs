@@ -7,7 +7,8 @@ public class HealAction : SpellAction
 {
     public const float ManaCostPerAmount = 0.8f;
 
-    public override string DSLName => "Heal";
+    public override string DSLName  => "Heal";
+    public override string Signature => "Heal(target, amount)";
 
     protected override float GetManaCost(List<object> args, int line, int col)
     {

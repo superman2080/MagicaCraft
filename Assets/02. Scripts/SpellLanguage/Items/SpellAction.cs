@@ -9,6 +9,10 @@ public abstract class SpellAction : SpellItem
     // DSL에서 이 명령어를 호출할 때 사용하는 이름 (예: "Bolt", "Heal")
     public abstract string DSLName { get; }
 
+    // 자동완성에서 표시할 시그니처 힌트 (예: "Bolt(target, element, damage)")
+    // 새 SpellAction 추가 시 반드시 override한다.
+    public virtual string Signature => DSLName;
+
     // SpellContext에 이 명령어를 등록한다.
     public void RegisterTo(SpellContext ctx)
         => ctx.RegisterCommand(DSLName, Invoke);

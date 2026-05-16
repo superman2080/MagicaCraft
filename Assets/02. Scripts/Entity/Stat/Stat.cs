@@ -81,7 +81,7 @@ public class Resource
         this.regenTick = Mathf.Max(0.01f, regenTick);
         tickDelta = 0f;
 
-        BindEvents();
+        Initialize();
     }
 
     public void Initialize()
@@ -239,7 +239,7 @@ public abstract class Stat<T> where T : Enum
     {
         foreach (var type in defaultStat.Keys)
         {
-            addValue[type] *= otherStat.StatDict[type];
+            multipleValue[type] *= otherStat.StatDict[type];
         }
     }
 

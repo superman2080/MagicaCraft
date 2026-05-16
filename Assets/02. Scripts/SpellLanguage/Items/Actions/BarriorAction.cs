@@ -9,7 +9,8 @@ public class BarriorAction : SpellAction
 {
     public const float ManaCostPerAmount = 0.7f;
 
-    public override string DSLName => "Barrior";
+    public override string DSLName  => "Barrior";
+    public override string Signature => "Barrior(target, amount, maintainTime)";
 
     protected override float GetManaCost(List<object> args, int line, int col)
     {

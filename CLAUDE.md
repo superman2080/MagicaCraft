@@ -259,7 +259,8 @@ BeforeStart() / AfterStart() / …                    // Unity API 호출용 훅
 단발성 효과. `Invoke` → `GetManaCost` → `Spend` → `Execute` 순으로 실행. 마나 차감 흐름 보장.
 
 ```csharp
-public abstract string DSLName { get; }
+public abstract string DSLName   { get; }
+public virtual  string Signature { get; }  // 자동완성 힌트 — 반드시 override
 protected abstract float  GetManaCost(List<object> args, int line, int col);
 protected abstract object Execute    (List<object> args, SpellContext ctx, int line, int col);
 ```
@@ -274,7 +275,31 @@ protected abstract object Execute    (List<object> args, SpellContext ctx, int l
 | `SetVelocityAction` | `SetVelocity` | `SetVelocity(proj, vel)` | 0 | 0 |
 | `SetSpeedAction` | `SetSpeed` | `SetSpeed(proj, speed)` | 0 | 0 |
 | `ExplodeAction` | `Explode` | `Explode(center, radius, element, damage)` | damage × (1.0 + radius × 0.5) | 1 |
-| `ShieldAction` | `Shield` | `Shield(target, amount)` | amount × 0.7 | 1 |
+| `BarriorAction` | `Barrior` | `Barrior(target, amount, maintainTime)` | amount × 0.7 | 1 |
+
+#### ⚠️ 새 SpellAction 추가 체크리스트
+
+1. `SpellAction` 상속, `DSLName` / `Signature` / `GetManaCost` / `Execute` 구현
+2. `SpellLibrary.CreateDefault()`에 `lib.Register(new MyAction { Tier = N })` 추가
+3. 자동완성·에러 오버레이는 **코드 수정 없이 자동 반영**됨
+
+```csharp
+// 최소 구현 예시
+public class MyAction : SpellAction
+{
+    public override string DSLName   => "MyAction";
+    public override string Signature => "MyAction(target, amount)";  // 자동완성 힌트
+
+    protected override float GetManaCost(List<object> args, int line, int col)
+        => (float)RequireDouble(args[1], Signature) * 1.0f;
+
+    protected override object Execute(List<object> args, SpellContext ctx, int line, int col)
+    {
+        // 구현
+        return null;
+    }
+}
+```
 
 ### 7. SpellLibrary (`SpellLanguage/Library/`)
 
@@ -285,6 +310,7 @@ var lib = SpellLibrary.CreateDefault();   // 티어 0 자동 해금, basicBolt �
 lib.UnlockTier(1);                        // 티어 1 해금
 lib.Unlock("myCustomSpell");              // 개별 해금
 lib.ApplyToContext(ctx);                  // SpellContext에 반영
+lib.GetAll();                             // 전체 아이템 열거 (자동완성 등 에디터 도구용)
 ```
 
 `ApplyToContext` 동작:
@@ -337,6 +363,27 @@ lib.ApplyToContext(ctx);                  // SpellContext에 반영
 마나는 마법 명령어 실행 시에만 소모 (제어문·연산자는 무료).
 각 `SpellAction` 서브클래스의 `ManaCostPerXxx` 상수에서 관리.
 
+#### 내장 함수 목록
+
+`Interpreter.BuiltinFunctions` 정적 배열에서 관리. **새 내장 함수 추가 시 `RegisterBuiltins()`와 동시에 이 배열에도 추가**해야 자동완성에 반영된다.
+
+| 함수 | 시그니처 | 설명 |
+|---|---|---|
+| `Vec2` | `Vec2(x, y)` | Vector2 생성 |
+| `Distance` | `Distance(a, b)` | 두 위치 간 거리 |
+| `Abs` | `Abs(x)` | 절댓값 |
+| `Min` / `Max` | `Min(a, b)` / `Max(a, b)` | 최솟값/최댓값 |
+| `Floor` / `Ceil` | `Floor(x)` / `Ceil(x)` | 내림/올림 |
+| `Sqrt` | `Sqrt(x)` | 제곱근 |
+| `Normalize` | `Normalize(vec)` | Vec2 단위 벡터 |
+| `GetMousePosition` | `GetMousePosition()` | 마우스 월드 좌표 |
+
+#### ⚠️ 새 내장 함수 추가 체크리스트
+
+1. `Interpreter.RegisterBuiltins()`에 `env.Define(...)` 추가
+2. `Interpreter.BuiltinFunctions` 정적 배열에 `("Name", "Name(params)")` 추가
+3. 자동완성에 **자동 반영**됨
+
 #### 엔티티 접근 가능 멤버
 
 ```
@@ -356,12 +403,18 @@ pos.x / pos.y      Vec2 좌표
 pos.magnitude      Vec2 크기
 ```
 
+#### ⚠️ 새 Entity/Proj 멤버 추가 체크리스트
+
+1. `SpellProjectileData` 또는 Entity 멤버 접근 코드(`Interpreter.cs`) 수정
+2. `AutocompleteProvider.MemberMap` 정적 딕셔너리에 해당 키의 배열에 멤버명 추가
+3. CLAUDE.md 위 목록 업데이트
+
 #### 티어별 해금 구조
 
 | 티어 | 시작 여부 | 주요 내용 |
 |---|---|---|
 | 0 | 처음부터 제공 | `Bolt`, `Heal`, `Fire`, `SetVelocity`, `SetSpeed`, `basicBolt` |
-| 1 | 해금 필요 | `Explode`, `Shield` |
+| 1 | 해금 필요 | `Explode`, `Barrior` |
 | 2 | 해금 필요 | `def` (함수 정의), 추가 명령어 (미구현) |
 
 #### 안전장치
@@ -385,6 +438,37 @@ var interp = new Interpreter(ctx, mana);
 interp.Run(new Parser(new Lexer(code).Tokenize()).Parse());
 ```
 
+### 9. SpellEditorUI (`UI/Layers/SpellEditorUI.cs`)
+
+인게임 DSL 코드 에디터 UI. Canvas 위에 오버레이로 표시된다.
+
+#### 에러 오버레이
+
+`TMP_InputField` 위에 `ErrorOverlay` (TextMeshProUGUI)를 겹쳐 렌더링.
+- `onValueChanged`마다 Lex → Parse 시도 (Interpreter 미실행)
+- `LexerException` / `ParserException` 발생 위치에 빨간 밑줄 표시
+- 오류 없으면 오버레이 클리어
+
+#### 자동완성 팝업
+
+`Awake()`에서 `AutocompleteProvider`와 팝업 UI를 동적으로 생성한다 (Builder 재실행 불필요).
+- `onValueChanged`마다 커서 직전 단어 분석 → 후보 팝업 표시
+- **Tab**: 첫 번째 후보 수락  |  **Click**: 해당 항목 수락  |  **Escape**: 팝업 닫기
+- `.` 직전 식별자가 `self` / `target` / `proj`이면 멤버 완성 모드
+
+#### 자동완성 확장 포인트 (`AutocompleteProvider.cs`)
+
+```
+Assets/02. Scripts/UI/Autocomplete/AutocompleteProvider.cs
+```
+
+| 추가 항목 | 수정 위치 |
+|---|---|
+| 새 SpellAction / SpellObject | SpellLibrary 등록만 → **자동 반영** |
+| 새 내장 함수 | `Interpreter.BuiltinFunctions` 배열 1줄 → **자동 반영** |
+| 새 DSL 키워드 | `AutocompleteProvider.Keywords` 배열 1줄 |
+| 새 Entity/Proj 멤버 | `AutocompleteProvider.MemberMap` 딕셔너리 1줄 |
+
 ---
 
 ## 디렉토리 구조 (주요 항목)
@@ -402,16 +486,19 @@ Assets/02. Scripts/
 ├── Projectile/           SpellProjectile, SpellProjectilePool
 ├── Utils/                ClampedFloat
 ├── Debug/                SpellDebugUI
+├── UI/
+│   ├── Layers/           SpellEditorUI (에디터 UI, 에러 오버레이, 자동완성 통합)
+│   └── Autocomplete/     AutocompleteProvider (DSL 자동완성 후보 관리)
 └── SpellLanguage/
     ├── AST/              ASTNode (Expr), ASTStmt (Stmt)
     ├── Core/             Token, Lexer, Parser
-    ├── Interpreter/      Interpreter, SpellEnvironment, ManaTracker
+    ├── Interpreter/      Interpreter (BuiltinFunctions 배열 포함), SpellEnvironment, ManaTracker
     ├── Runtime/          SpellContext, SpellProjectileData,
     │                     SpellSkill (OneShot/Continuous), SkillCodeSlot, SkillParameter
     ├── Items/
     │   ├── SpellItem.cs          추상 기반
     │   ├── SpellObject.cs        라이프사이클 객체 기반
-    │   ├── SpellAction.cs        단발성 효과 기반
+    │   ├── SpellAction.cs        단발성 효과 기반 (DSLName + Signature 필수)
     │   ├── Objects/
     │   │   ├── ProjectileObject.cs
     │   │   └── ControllableObject.cs
@@ -420,9 +507,9 @@ Assets/02. Scripts/
     │       ├── HealAction.cs
     │       ├── FireAction.cs
     │       ├── ExplodeAction.cs
-    │       ├── ShieldAction.cs
+    │       ├── BarriorAction.cs
     │       ├── SetVelocityAction.cs
     │       └── SetSpeedAction.cs
     └── Library/
-        └── SpellLibrary.cs       잠금/해금 레지스트리
+        └── SpellLibrary.cs       잠금/해금 레지스트리 (GetAll() 포함)
 ```

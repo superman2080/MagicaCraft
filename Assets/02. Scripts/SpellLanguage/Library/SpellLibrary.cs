@@ -31,6 +31,10 @@ public class SpellLibrary
 
     public bool IsUnlocked(string name) => unlocked.Contains(name);
 
+    // 등록된 모든 아이템을 반환한다 (해금 여부 무관).
+    // AutocompleteProvider 등 에디터 도구에서 전체 후보를 수집할 때 사용한다.
+    public IEnumerable<SpellItem> GetAll() => registry.Values;
+
     // 해금된 아이템을 SpellContext에 적용한다.
     //   SpellAction  → 명령어로 등록
     //   SpellObject  → SpellObject 변수로 등록

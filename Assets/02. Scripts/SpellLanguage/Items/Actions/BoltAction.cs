@@ -7,7 +7,8 @@ public class BoltAction : SpellAction
 {
     public const float ManaCostPerDamage = 1.0f;
 
-    public override string DSLName => "Bolt";
+    public override string DSLName  => "Bolt";
+    public override string Signature => "Bolt(target, element, damage)";
 
     protected override float GetManaCost(List<object> args, int line, int col)
     {

@@ -8,7 +8,8 @@ using System.Collections.Generic;
 //   SetSpeed(proj, proj.speed * 1.5)
 public class SetSpeedAction : SpellAction
 {
-    public override string DSLName => "SetSpeed";
+    public override string DSLName  => "SetSpeed";
+    public override string Signature => "SetSpeed(proj, speed)";
 
     protected override float GetManaCost(List<object> args, int line, int col) => 0f;
 

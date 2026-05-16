@@ -130,6 +130,17 @@ public static class SpellEditorUIBuilder
         inputTmp.overflowMode       = TextOverflowModes.Overflow;
         inputField.textComponent    = inputTmp;
 
+        // ErrorOverlay: Text GO의 자식으로 생성해 스크롤 자동 연동
+        var errorOverlayGo = MakeRect("ErrorOverlay", inputText.transform);
+        StretchRect(errorOverlayGo.GetComponent<RectTransform>());
+        var errorOverlayTmp = errorOverlayGo.AddComponent<TextMeshProUGUI>();
+        errorOverlayTmp.fontSize           = 13;
+        errorOverlayTmp.color              = Color.white;
+        errorOverlayTmp.richText           = true;
+        errorOverlayTmp.enableWordWrapping = false;
+        errorOverlayTmp.overflowMode       = TextOverflowModes.Overflow;
+        errorOverlayTmp.raycastTarget      = false;
+
         inputField.lineType          = TMP_InputField.LineType.MultiLineNewline;
         inputField.richText          = false;
         inputField.scrollSensitivity = 20f;
@@ -202,15 +213,16 @@ public static class SpellEditorUIBuilder
 
         // ── SpellEditorUI 참조 연결 ───────────────────────────
         var so = new SerializedObject(editorUI);
-        so.FindProperty("codeInput").objectReferenceValue   = inputField;
-        so.FindProperty("logText").objectReferenceValue     = logTmp;
-        so.FindProperty("logScroll").objectReferenceValue   = scrollRect;
-        so.FindProperty("manaLabel").objectReferenceValue   = manaLabel;
-        so.FindProperty("casterLabel").objectReferenceValue = casterLabel;
-        so.FindProperty("targetLabel").objectReferenceValue = targetLabel;
-        so.FindProperty("runButton").objectReferenceValue   = runBtn.GetComponent<Button>();
-        so.FindProperty("clearButton").objectReferenceValue = clearBtn.GetComponent<Button>();
-        so.FindProperty("closeButton").objectReferenceValue = closeBtn.GetComponent<Button>();
+        so.FindProperty("codeInput").objectReferenceValue    = inputField;
+        so.FindProperty("errorOverlay").objectReferenceValue = errorOverlayTmp;
+        so.FindProperty("logText").objectReferenceValue      = logTmp;
+        so.FindProperty("logScroll").objectReferenceValue    = scrollRect;
+        so.FindProperty("manaLabel").objectReferenceValue    = manaLabel;
+        so.FindProperty("casterLabel").objectReferenceValue  = casterLabel;
+        so.FindProperty("targetLabel").objectReferenceValue  = targetLabel;
+        so.FindProperty("runButton").objectReferenceValue    = runBtn.GetComponent<Button>();
+        so.FindProperty("clearButton").objectReferenceValue  = clearBtn.GetComponent<Button>();
+        so.FindProperty("closeButton").objectReferenceValue  = closeBtn.GetComponent<Button>();
         so.ApplyModifiedPropertiesWithoutUndo();
 
         // ── Prefab 저장 ───────────────────────────────────────

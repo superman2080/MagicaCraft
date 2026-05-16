@@ -23,6 +23,23 @@ public class Interpreter
     // 단일 loop/while의 최대 반복 횟수 (무한 루프 방지)
     private const int MaxIterations = 1000;
 
+    // 내장 함수 목록 — 자동완성 등 에디터 도구에서 읽는다.
+    // 새 내장 함수 추가 시 RegisterBuiltins()와 동시에 여기에도 추가한다.
+    public static readonly (string Name, string Signature)[] BuiltinFunctions =
+    {
+        ("Vec2",             "Vec2(x, y)"),
+        ("Distance",         "Distance(a, b)"),
+        ("Abs",              "Abs(x)"),
+        ("Min",              "Min(a, b)"),
+        ("Max",              "Max(a, b)"),
+        ("Floor",            "Floor(x)"),
+        ("Ceil",             "Ceil(x)"),
+        ("Sqrt",             "Sqrt(x)"),
+        ("Print",             "Print(str)"),
+        ("Normalize",        "Normalize(vec)"),
+        ("GetMousePosition", "GetMousePosition()"),
+    };
+
     // ─── 생성자 ───────────────────────────────────────────────
 
     // extraVars: 함수 호출 시 파라미터를 초기 변수로 주입하기 위해 사용

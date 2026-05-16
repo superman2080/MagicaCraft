@@ -9,7 +9,8 @@ public class ExplodeAction : SpellAction
     public const float ManaCostPerDamage = 1.0f;
     public const float RadiusMul         = 0.5f;
 
-    public override string DSLName => "Explode";
+    public override string DSLName  => "Explode";
+    public override string Signature => "Explode(center, radius, element, damage)";
 
     protected override float GetManaCost(List<object> args, int line, int col)
     {

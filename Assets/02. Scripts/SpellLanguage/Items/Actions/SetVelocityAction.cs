@@ -8,7 +8,8 @@ using System.Collections.Generic;
 //   SetVelocity(proj, Normalize(target.position - proj.position) * proj.speed)
 public class SetVelocityAction : SpellAction
 {
-    public override string DSLName => "SetVelocity";
+    public override string DSLName  => "SetVelocity";
+    public override string Signature => "SetVelocity(proj, vel)";
 
     protected override float GetManaCost(List<object> args, int line, int col) => 0f;
 

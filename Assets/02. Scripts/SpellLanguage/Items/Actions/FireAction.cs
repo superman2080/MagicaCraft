@@ -10,7 +10,8 @@ public class FireAction : SpellAction
 {
     public const float ManaCostPerDamage = 0.5f;
 
-    public override string DSLName => "Fire";
+    public override string DSLName  => "Fire";
+    public override string Signature => "Fire(projObj, startPos, dir, speed)";
 
     protected override float GetManaCost(List<object> args, int line, int col)
     {
