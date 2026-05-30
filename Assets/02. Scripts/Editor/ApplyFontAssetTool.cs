@@ -13,7 +13,6 @@ public class ApplyFontAssetTool: EditorWindow
         /*        targetTexture = (Texture2D)EditorGUILayout.ObjectField(
             "Texture", targetTexture, typeof(Texture2D), allowSceneObjects: false)
         */
-
         fontAsset = EditorGUILayout.ObjectField("Apply Font", fontAsset, typeof(TMP_FontAsset), allowSceneObjects: false) as TMP_FontAsset;
         if (GUILayout.Button("Apply"))
         {

@@ -1,100 +1,109 @@
-# Research — SpellEditorUI 자동완성
+# Research — DSL 코드 저장/불러오기
 
-## 목표
-코드 입력창에서 DSL 식별자를 타이핑할 때 후보 목록을 팝업으로 표시하고, 선택 시 단어를 치환한다.
+## 목적
 
----
-
-## 자동완성 후보 전체 목록
-
-### 전역 후보 (식별자 앞 부분 일치)
-
-| 카테고리 | 항목 |
-|---|---|
-| 키워드 | `let`, `if`, `else`, `loop`, `while`, `def`, `return`, `true`, `false` |
-| SpellAction 명령어 | `Bolt`, `Heal`, `Fire`, `SetVelocity`, `SetSpeed`, `Explode`, `Barrior`, `Print` |
-| 내장 함수 | `Vec2`, `Distance`, `Abs`, `Min`, `Max`, `Floor`, `Ceil`, `Sqrt`, `Normalize`, `GetMousePosition` |
-| 내장 변수 | `self`, `target`, `power` |
-| SpellObject 변수 | `basicBolt` (+ 추가 등록분) |
-| 속성 상수 | `None`, `Fire`, `Water`, `Ice`, `Lightning`, `Earth`, `Wind`, `Light`, `Dark` |
-
-### 멤버 후보 (`.` 뒤)
-
-| 앞 식별자 | 멤버 목록 |
-|---|---|
-| `self`, `target` (Entity) | `hp`, `maxHp`, `hpRatio`, `moveSpeed`, `position` |
-| `proj` (SpellProjectileData) | `position`, `velocity`, `speed`, `damage`, `element` |
-| Vec2 변수 (`.x` 컨텍스트) | `x`, `y`, `magnitude` |
+인게임 DSL 에디터(`SpellEditorUI`)에서 작성한 코드를 파일로 저장하고, 저장된 코드를 다시 불러오는 기능 추가.
 
 ---
 
-## 트리거 조건
+## 관련 파일 분석
 
-- **전역**: 커서 직전에 식별자 문자(Letter/Digit/`_`)가 1자 이상 → prefix 일치 후보 존재 시 표시
-- **멤버**: 커서 직전 단어 앞에 `.`가 붙어 있으면 → 앞 식별자 종류에 따라 멤버 후보
-- **숨김**: prefix가 비거나 후보 0개 → 팝업 숨김; Escape 키; 입력 포커스 상실
+### `SpellEditorUI.cs` (UI/Layers/)
 
----
+현재 구조:
+- `TMP_InputField codeInput` — 코드 입력 필드 (`[SerializeField] private`)
+- Inspector 버튼: `runButton`, `clearButton`, `closeButton` — 모두 `[SerializeField] private Button`
+- ButtonBar는 `SpellEditorUIBuilder`에서 `HorizontalLayoutGroup`으로 생성
+- 저장/불러오기 관련 코드 **전혀 없음**
 
-## 입력 처리
+저장 대상: `codeInput.text` (단순 문자열) + 사용자 입력 이름 + 저장 시각
 
-| 키 | 동작 |
-|---|---|
-| Tab | 첫 번째(강조된) 후보 수락 |
-| Click | 클릭한 항목 수락 |
-| Escape | 팝업 닫기 |
-| Up/Down | 비충돌 → 구현 생략 (Tab·클릭으로 충분) |
+### `SpellEditorUIBuilder.cs` (Editor/)
 
-수락 시 커서 직전 단어 전체를 선택한 후보로 치환하고 팝업을 닫는다.
-
----
-
-## 기술 제약
-
-- `TMP_InputField.richText = false` → 입력창 내부 서식 불가
-- Tab 키는 `TMP_InputField`가 소비하지 않으므로 `Update()`에서 `Keyboard.current.tabKey.wasPressedThisFrame`으로 감지 가능
-- Escape는 `TMP_InputField`가 deactivate를 트리거하므로 `onSelect` / `onDeselect`로 별도 처리 필요
-- 팝업 위치: TMP `textInfo.characterInfo`로 커서 위치를 얻어 팝업을 커서 바로 아래에 배치
+- `ButtonBar` (HorizontalLayoutGroup)에 Run/Clear 버튼 + Spacer + HintText 배치
+- `so.FindProperty(...)` 패턴으로 `SpellEditorUI` SerializedField에 참조 연결
+- **Save/Load 버튼 현재 없음** → Builder에도 추가 필요
 
 ---
 
-## 신규 클래스
+## 저장 방식
 
-### `AutocompleteProvider` (pure C#, non-MonoBehaviour)
-- 전역 후보 리스트 + 멤버 후보 딕셔너리 보관
-- `GetGlobalCompletions(string prefix)` → 최대 8개 반환 (prefix 앞글자 일치)
-- `GetMemberCompletions(string identifier)` → 멤버 후보
+### 옵션 비교
 
-### `AutocompleteEntry` (record)
+| 방식 | 장점 | 단점 |
+|---|---|---|
+| `PlayerPrefs` | 간단 | 코드 길이 제한, 목록 관리 불편 |
+| `persistentDataPath` + JSON | 파일 단위 관리, 빌드 호환 | 파일 I/O 필요 |
+| `ScriptableObject` | Inspector 연동 | 런타임 저장 불가 |
+
+**결론: `Application.persistentDataPath/Spells/` 에 JSON 파일로 저장**
+
+---
+
+## 데이터 구조
+
 ```csharp
-public record AutocompleteEntry(string Label, string Detail);
-// Label: 삽입 텍스트, Detail: 괄호형 시그니처 등 설명
+[Serializable]
+private class SpellSaveData   // SpellEditorUI 내 중첩 클래스
+{
+    public string name;       // 표시용 이름
+    public string code;       // DSL 코드 원문
+    public string savedAt;    // 저장 시각 (yyyy-MM-dd HH:mm)
+}
 ```
+
+파일 경로: `{persistentDataPath}/Spells/{sanitized_name}.json`
+파일명 정제: `/ \ : * ? " < > |` 제거
 
 ---
 
-## UI 구조 (런타임 동적 생성)
+## UI 설계
 
-팝업은 `SpellEditorUI.Awake()`에서 코드로 생성 — Builder 재실행 불필요.
+### 저장 흐름
+1. Save 버튼 클릭 → 이름 입력 팝업 표시 (런타임 생성)
+2. Confirm → JSON 저장 (동일 이름 있으면 덮어쓰기)
+3. 로그에 저장 성공/실패 메시지 출력
 
+### 불러오기 흐름
+1. Load 버튼 클릭 → 저장 목록 팝업 표시
+2. 항목 클릭 → `codeInput.text` 교체, 팝업 닫기
+3. 저장 파일이 없으면 로그에 안내 메시지
+
+### 팝업 UI
+
+두 팝업 모두 자동완성 팝업과 동일 패턴(런타임 생성, Canvas 자식):
+
+**저장 이름 입력 팝업 (`savePopup`):**
 ```
-AutocompletePopup (RectTransform, 팝업 루트)
-├── Background (Image, #21252B)
-└── ItemContainer (VerticalLayoutGroup)
-    ├── Item0 (Button + TextMeshProUGUI) ← 강조 배경
-    ├── Item1
-    ...
-    └── Item7 (최대 8개 고정 슬롯)
+[TMP_InputField: 이름 입력] [저장] [취소]
 ```
+- 너비 350, 키보드 Submit(Enter) → 저장 트리거
 
-팝업 위치: `SpellEditorUI`의 Canvas 기준으로 TMP `characterInfo`에서 얻은 커서 localPosition 아래에 배치.
+**불러오기 목록 팝업 (`loadPopup`):**
+```
+■ MySpell1     2026-05-30
+■ FireBolt     2026-05-29
+...
+[취소]
+```
+- ScrollRect 내 VerticalLayoutGroup, 최대 10개 표시
 
 ---
 
 ## 영향 범위
 
-| 파일 | 변경 유형 |
+| 파일 | 변경 내용 |
 |---|---|
-| `Assets/02. Scripts/UI/Layers/SpellEditorUI.cs` | 자동완성 로직 통합, Update() 탭키 처리 |
-| `Assets/02. Scripts/UI/Autocomplete/AutocompleteProvider.cs` | 신규 (pure C#) |
-| Builder / Prefab | **변경 없음** — 팝업 UI 전부 런타임 생성 |
+| `SpellEditorUI.cs` | saveButton/loadButton 필드 추가, 팝업 빌더·저장·불러오기 로직 |
+| `SpellEditorUIBuilder.cs` | ButtonBar에 Save/Load 버튼 추가, SerializedObject 연결 |
+
+**신규 파일 없음** — `SpellSaveData`는 `SpellEditorUI` 내 중첩 클래스
+
+---
+
+## 주의사항
+
+- `Application.persistentDataPath`는 에디터에서도 정상 동작 (빌드 없이 테스트 가능)
+- 파일명에 사용 불가 문자 정제 필수
+- 불러오기 팝업은 `BuildLoadPopup()`으로 `Show()` 시 목록 갱신 (매번 파일 스캔)
+- `SpellEditorUIBuilder` 재실행 시 기존 씬 오브젝트를 `DestroyImmediate`하고 새로 생성하므로 변경사항이 반영됨
